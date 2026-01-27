@@ -629,39 +629,96 @@ Strict Directives:
     // Copy-to-clipboard behavior for the two outpaint boxes.
     (function () {
       function copyHandler(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
         const targetId = e.currentTarget.getAttribute('data-target');
         const ta = document.getElementById(targetId);
         if (!ta) return;
         const text = ta.value;
+        
+        if (!text || text.trim() === '') {
+          alert('Nothing to copy');
+          return;
+        }
+        
+        const button = e.currentTarget;
+        const originalText = button.innerText;
+        
+        // Try modern clipboard API first
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(text).then(() => {
-            const original = e.currentTarget.innerText;
-            e.currentTarget.innerText = 'Copied!';
-            setTimeout(() => { e.currentTarget.innerText = original; }, 1400);
-          }).catch(() => {
-            // fallback
-            ta.select();
-            try {
-              document.execCommand('copy');
-              const original = e.currentTarget.innerText;
-              e.currentTarget.innerText = 'Copied!';
-              setTimeout(() => { e.currentTarget.innerText = original; }, 1400);
-            } catch (err) {
-              alert('Copy failed — please select the text and press Ctrl/Cmd+C');
-            }
+            button.innerText = 'Copied!';
+            setTimeout(() => { button.innerText = originalText; }, 1400);
+          }).catch((err) => {
+            console.warn('Clipboard API failed:', err);
+            // Fallback to execCommand with temporary element
+            fallbackCopyWithTempElement(text, button, originalText);
           });
         } else {
-          // very old browsers fallback
+          // Very old browsers fallback
+          fallbackCopyWithTempElement(text, button, originalText);
+        }
+      }
+      
+      function fallbackCopyWithTempElement(text, button, originalText) {
+        // Create a temporary textarea element for copying (more reliable)
+        const tempTextarea = document.createElement('textarea');
+        tempTextarea.value = text;
+        tempTextarea.style.position = 'fixed';
+        tempTextarea.style.left = '-999999px';
+        tempTextarea.style.top = '-999999px';
+        tempTextarea.style.opacity = '0';
+        tempTextarea.setAttribute('readonly', '');
+        document.body.appendChild(tempTextarea);
+        
+        // Focus and select
+        tempTextarea.focus();
+        tempTextarea.select();
+        tempTextarea.setSelectionRange(0, text.length);
+        
+        try {
+          const successful = document.execCommand('copy');
+          document.body.removeChild(tempTextarea);
+          
+          if (successful) {
+            button.innerText = 'Copied!';
+            setTimeout(() => { button.innerText = originalText; }, 1400);
+          } else {
+            // Last resort: try with original textarea
+            fallbackCopyOriginal(text, button, originalText);
+          }
+        } catch (err) {
+          document.body.removeChild(tempTextarea);
+          console.warn('execCommand failed:', err);
+          // Last resort: try with original textarea
+          fallbackCopyOriginal(text, button, originalText);
+        }
+      }
+      
+      function fallbackCopyOriginal(text, button, originalText) {
+        // Try to find and use the original textarea
+        const targetId = button.getAttribute('data-target');
+        const ta = document.getElementById(targetId);
+        if (ta) {
+          ta.focus();
           ta.select();
+          ta.setSelectionRange(0, text.length);
+          
           try {
-            document.execCommand('copy');
-            const original = e.currentTarget.innerText;
-            e.currentTarget.innerText = 'Copied!';
-            setTimeout(() => { e.currentTarget.innerText = original; }, 1400);
+            const successful = document.execCommand('copy');
+            if (successful) {
+              button.innerText = 'Copied!';
+              setTimeout(() => { button.innerText = originalText; }, 1400);
+              return;
+            }
           } catch (err) {
-            alert('Copy failed — please select the text and press Ctrl/Cmd+C');
+            console.warn('Original textarea copy failed:', err);
           }
         }
+        
+        // If all else fails, show helpful message
+        alert('Copy failed — please select the text manually and press Ctrl/Cmd+C');
       }
 
       document.addEventListener('DOMContentLoaded', function () {
