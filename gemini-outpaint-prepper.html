@@ -565,5 +565,112 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<DetailPreserveImageResizer />);
 
   </script>
+  <!-- Simple outpaint prompts (added) -->
+  <div id="simple-outpaint-prompts" style="padding:1rem; max-width:100%; border-top:1px solid #333; margin-top:1rem;">
+    <h3 style="margin:0 0 0.5rem 0; font-weight:600; color:#fff;">simple outpaint prompts</h3>
+
+    <div style="display:flex; flex-direction:column; gap:0.5rem;">
+
+      <div style="display:flex; gap:0.5rem; align-items:flex-start;">
+        <div style="flex:1;">
+          <label for="outpaint-1" style="display:block; font-size:0.95rem; color:#ddd; margin-bottom:0.25rem;">First the handshake</label>
+          <textarea id="outpaint-1" rows="4" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid #444; background:#0b0b0b; color:#eee; font-family:monospace;">System Role: High-Fidelity Neutral Photo Extender.
+
+Objective: Seamlessly fill the #808080 Grey Zone by logically continuing existing textures and geometry, without adding significant new subjects.
+
+
+The Master Rules:
+
+1. Sacred Core Firewall: The central original image pixels are PERMANENTLY LOCKED. Do not alter colors, lighting, or content inside.
+
+2. The #808080 Work Zone: The grey border is the only area for new generation.
+
+3. Contextual Edge Analysis: Analyze the pixels immediately along the boundary of the Sacred Core. Your job is to mathematically extend the trajectories of existing lines, shapes, and textures into the Work Zone.
+
+4. Neutral Continuation Directive: The extension must be "quiet" and environmental.
+
+   - ALLOWED: Completing objects cut off by the frame (e.g., finishing a pipe downwards, extending a wall sideways).
+
+   - FORBIDDEN: Adding entirely new, independent complex objects, people, vehicles, or architectural features not implied by the core edges.
+
+5. Anti-Mirror/Anti-Tile: Do not mirror or repeat the core image.
+
+6. 5:7 Vertical Ratio: Output in Portrait 5:7 aspect ratio.
+
+
+Confirmation: Respond only with: "Universal Neutral Extension Mode Locked. Ready for any input."</textarea>
+        </div>
+        <div style="align-self:flex-end;">
+          <button class="copy-btn" data-target="outpaint-1" style="padding:0.5rem 0.75rem; border-radius:6px; border:1px solid #333; background:#374151; color:#fff; cursor:pointer;">Copy</button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:0.5rem; align-items:flex-start;">
+        <div style="flex:1;">
+          <label for="outpaint-2" style="display:block; font-size:0.95rem; color:#ddd; margin-bottom:0.25rem;">Now the out-paint command (attach the grey bordered image)</label>
+          <textarea id="outpaint-2" rows="4" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid #444; background:#0b0b0b; color:#eee; font-family:monospace;">NEW PROJECT / MEMORY FLUSH: Apply Universal Neutral Rules to this image.
+
+Strict Directives:
+- ANALYZE EDGES: Look at where the original image meets the grey border.
+- LOGICAL EXTEND: Continue the existing atmosphere naturally into the empty space.
+- REMAIN NEUTRAL: Do not add distracting new elements or complex structures. Keep it simple background continuation.
+- PROTECT CORE COLORS: Keep the center pristine.
+- HIGH FIDELITY: Seamless, high-resolution output.</textarea>
+        </div>
+        <div style="align-self:flex-end;">
+          <button class="copy-btn" data-target="outpaint-2" style="padding:0.5rem 0.75rem; border-radius:6px; border:1px solid #333; background:#374151; color:#fff; cursor:pointer;">Copy</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Copy-to-clipboard behavior for the two outpaint boxes.
+    (function () {
+      function copyHandler(e) {
+        const targetId = e.currentTarget.getAttribute('data-target');
+        const ta = document.getElementById(targetId);
+        if (!ta) return;
+        const text = ta.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            const original = e.currentTarget.innerText;
+            e.currentTarget.innerText = 'Copied!';
+            setTimeout(() => { e.currentTarget.innerText = original; }, 1400);
+          }).catch(() => {
+            // fallback
+            ta.select();
+            try {
+              document.execCommand('copy');
+              const original = e.currentTarget.innerText;
+              e.currentTarget.innerText = 'Copied!';
+              setTimeout(() => { e.currentTarget.innerText = original; }, 1400);
+            } catch (err) {
+              alert('Copy failed — please select the text and press Ctrl/Cmd+C');
+            }
+          });
+        } else {
+          // very old browsers fallback
+          ta.select();
+          try {
+            document.execCommand('copy');
+            const original = e.currentTarget.innerText;
+            e.currentTarget.innerText = 'Copied!';
+            setTimeout(() => { e.currentTarget.innerText = original; }, 1400);
+          } catch (err) {
+            alert('Copy failed — please select the text and press Ctrl/Cmd+C');
+          }
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.copy-btn').forEach(function (btn) {
+          btn.addEventListener('click', copyHandler);
+        });
+      });
+    })();
+  </script>
+  <!-- End added block -->
 </body>
 </html>
