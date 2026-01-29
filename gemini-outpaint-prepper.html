@@ -74,8 +74,6 @@
       const { useRef, useState, useEffect, useCallback } = React;
 
       function DetailPreserveImageResizer() {
-        const CANVAS_W = 3264;
-        const CANVAS_H = 4440;
         const BG_COLOR = "#808080";
 
         // embedded overlay data URI (may be empty)
@@ -83,6 +81,8 @@
 
         const containerRef = useRef(null);
         const canvasRef = useRef(null);
+        const [canvasW, setCanvasW] = useState(3264);
+        const [canvasH, setCanvasH] = useState(4440);
         const [canvasScale, setCanvasScale] = useState(0.25);
         const [canvasMaxHeight, setCanvasMaxHeight] = useState("70vh");
 
@@ -155,6 +155,21 @@
           img.src = OVERLAY_SRC;
         }, [OVERLAY_SRC]);
 
+        // Clamp image position when canvas size changes
+        useEffect(() => {
+          if (!imageObj) return;
+          setImgState((s) => {
+            let { x, y, w, h } = s;
+            // Clamp position to keep image within canvas bounds
+            x = Math.max(0, Math.min(x, canvasW - w));
+            y = Math.max(0, Math.min(y, canvasH - h));
+            // Clamp size if image is larger than canvas
+            w = Math.min(w, canvasW);
+            h = Math.min(h, canvasH);
+            return { x, y, w, h };
+          });
+        }, [canvasW, canvasH, imageObj]);
+
         const onFile = (e) => {
           const f = e.target.files?.[0];
           if (!f) return;
@@ -165,16 +180,16 @@
               setImageObj(img);
               const aspect = img.width / img.height;
               setOrigAspect(aspect);
-              const maxW = CANVAS_W * 0.8;
-              const maxH = CANVAS_H * 0.8;
+              const maxW = canvasW * 0.8;
+              const maxH = canvasH * 0.8;
               let w = img.width;
               let h = img.height;
               const scale = Math.min(maxW / w, maxH / h, 1);
               w = Math.round(w * scale);
               h = Math.round(h * scale);
               setImgState({
-                x: Math.round((CANVAS_W - w) / 2),
-                y: Math.round((CANVAS_H - h) / 2),
+                x: Math.round((canvasW - w) / 2),
+                y: Math.round((canvasH - h) / 2),
                 w,
                 h,
               });
@@ -190,7 +205,7 @@
           const ctx = canvas.getContext("2d");
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.fillStyle = BG_COLOR;
-          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+          ctx.fillRect(0, 0, canvasW, canvasH);
 
           if (imageObj) {
             ctx.save();
@@ -239,32 +254,32 @@
           } else {
             // Empty state
             ctx.fillStyle = "rgba(0,0,0,0.25)";
-            ctx.fillRect(24, 24, CANVAS_W - 48, CANVAS_H - 48);
+            ctx.fillRect(24, 24, canvasW - 48, canvasH - 48);
             ctx.fillStyle = "white";
             ctx.font = "bold 48px sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText("Upload an Image", CANVAS_W / 2, CANVAS_H / 2 - 100);
+            ctx.fillText("Upload an Image", canvasW / 2, canvasH / 2 - 100);
             ctx.font = "24px sans-serif";
             ctx.fillStyle = "rgba(255,255,255,0.7)";
-            ctx.fillText("Click 'Choose File' to get started", CANVAS_W / 2, CANVAS_H / 2 - 40);
+            ctx.fillText("Click 'Choose File' to get started", canvasW / 2, canvasH / 2 - 40);
             ctx.font = "20px sans-serif";
-            ctx.fillText("Drag and resize your image", CANVAS_W / 2, CANVAS_H / 2 + 20);
-            ctx.fillText("Works on mobile and desktop", CANVAS_W / 2, CANVAS_H / 2 + 60);
+            ctx.fillText("Drag and resize your image", canvasW / 2, canvasH / 2 + 20);
+            ctx.fillText("Works on mobile and desktop", canvasW / 2, canvasH / 2 + 60);
             ctx.textAlign = "left";
           }
 
           if (showOverlay && overlayObj) {
-            ctx.drawImage(overlayObj, 0, 0, CANVAS_W, CANVAS_H);
+            ctx.drawImage(overlayObj, 0, 0, canvasW, canvasH);
           }
-        }, [imageObj, imgState, showOverlay, overlayObj]);
+        }, [imageObj, imgState, showOverlay, overlayObj, canvasW, canvasH]);
 
         useEffect(() => {
           const preview = canvasRef.current;
           if (!preview) return;
-          preview.width = CANVAS_W;
-          preview.height = CANVAS_H;
+          preview.width = canvasW;
+          preview.height = canvasH;
           drawPreview();
-        }, [drawPreview]);
+        }, [drawPreview, canvasW, canvasH]);
 
         useEffect(
           () => drawPreview(),
@@ -488,19 +503,19 @@
               // Very small screens (mobile) - scale to fit width with some margin
               scale = Math.max(
                 0.09,
-                Math.min(0.13, (availableWidth * 0.95) / CANVAS_W),
+                Math.min(0.13, (availableWidth * 0.95) / canvasW),
               );
             } else if (availableWidth < 640) {
               // Small mobile screens
               scale = Math.max(
                 0.13,
-                Math.min(0.19, (availableWidth * 0.9) / CANVAS_W),
+                Math.min(0.19, (availableWidth * 0.9) / canvasW),
               );
             } else if (availableWidth < 768) {
               // Tablets
               scale = Math.max(
                 0.16,
-                Math.min(0.22, (availableWidth * 0.85) / CANVAS_W),
+                Math.min(0.22, (availableWidth * 0.85) / canvasW),
               );
             } else if (availableWidth < 1024) {
               // Medium screens
@@ -513,7 +528,7 @@
             setCanvasScale(scale);
 
             // Calculate max height based on scaled canvas height
-            const scaledHeight = CANVAS_H * scale;
+            const scaledHeight = canvasH * scale;
             const viewportHeight = window.innerHeight;
 
             // Use 80% of viewport height, or scaled canvas height + 100px padding, whichever is smaller
@@ -527,13 +542,13 @@
           calculateScale();
           window.addEventListener("resize", calculateScale);
           return () => window.removeEventListener("resize", calculateScale);
-        }, []);
+        }, [canvasW, canvasH]);
 
         const centerHorizontally = () => {
-          setImgState((s) => ({ ...s, x: Math.round((CANVAS_W - s.w) / 2) }));
+          setImgState((s) => ({ ...s, x: Math.round((canvasW - s.w) / 2) }));
         };
         const centerVertically = () => {
-          setImgState((s) => ({ ...s, y: Math.round((CANVAS_H - s.h) / 2) }));
+          setImgState((s) => ({ ...s, y: Math.round((canvasH - s.h) / 2) }));
         };
 
         const standardResizeToCanvas = (
@@ -686,11 +701,11 @@
           if (!imageObj) return;
           setIsProcessing(true);
           const final = document.createElement("canvas");
-          final.width = CANVAS_W;
-          final.height = CANVAS_H;
+          final.width = canvasW;
+          final.height = canvasH;
           const fctx = final.getContext("2d");
           fctx.fillStyle = BG_COLOR;
-          fctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+          fctx.fillRect(0, 0, canvasW, canvasH);
 
           const temp = document.createElement("canvas");
           temp.width = imgState.w;
@@ -839,6 +854,115 @@
               </div>
             </div>
 
+            <div className="mb-4 p-3 bg-[#1a1a1a] border border-[#333] rounded-lg">
+              <h4 className="font-semibold text-sm sm:text-base mb-2">
+                Canvas Size
+              </h4>
+              <div className="flex flex-wrap gap-3 items-center">
+                <label className="flex items-center gap-2 text-sm sm:text-base">
+                  <span>Width:</span>
+                  <input
+                    type="number"
+                    min="100"
+                    step="1"
+                    value={canvasW}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value || 100);
+                      if (val >= 100) setCanvasW(val);
+                    }}
+                    className="px-2 py-2 sm:py-1 rounded border border-[#333] bg-[#0b0b0b] text-[#eee] text-sm w-24 min-h-[44px] sm:min-h-0"
+                  />
+                  <span className="text-xs text-slate-400">px</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm sm:text-base">
+                  <span>Height:</span>
+                  <input
+                    type="number"
+                    min="100"
+                    step="1"
+                    value={canvasH}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value || 100);
+                      if (val >= 100) setCanvasH(val);
+                    }}
+                    className="px-2 py-2 sm:py-1 rounded border border-[#333] bg-[#0b0b0b] text-[#eee] text-sm w-24 min-h-[44px] sm:min-h-0"
+                  />
+                  <span className="text-xs text-slate-400">px</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-xs sm:text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
+                    onClick={() => {
+                      setCanvasW(3264);
+                      setCanvasH(4440);
+                    }}
+                    title="Default: 3264 × 4440"
+                  >
+                    Default
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-xs sm:text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
+                    onClick={() => {
+                      setCanvasW(2048);
+                      setCanvasH(2048);
+                    }}
+                    title="Square: 2048 × 2048"
+                  >
+                    1:1
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-xs sm:text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
+                    onClick={() => {
+                      setCanvasW(3264);
+                      setCanvasH(2448);
+                    }}
+                    title="4:3: 3264 × 2448"
+                  >
+                    4:3
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-xs sm:text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
+                    onClick={() => {
+                      setCanvasW(3264);
+                      setCanvasH(1836);
+                    }}
+                    title="16:9: 3264 × 1836"
+                  >
+                    16:9
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-xs sm:text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
+                    onClick={() => {
+                      setCanvasW(2448);
+                      setCanvasH(3264);
+                    }}
+                    title="3:4: 2448 × 3264"
+                  >
+                    3:4
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-xs sm:text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
+                    onClick={() => {
+                      setCanvasW(1836);
+                      setCanvasH(3264);
+                    }}
+                    title="9:16: 1836 × 3264"
+                  >
+                    9:16
+                  </button>
+                </div>
+              </div>
+              <div className="text-xs sm:text-sm text-slate-400 mt-2">
+                Aspect ratio: {(canvasW / canvasH).toFixed(2)}:1
+              </div>
+            </div>
+
             <div
               className={`border border-[#333] w-full overflow-auto -mx-4 sm:mx-0 px-2 sm:px-0 transition-all ${activeInteraction ? 'border-blue-500' : ''}`}
               style={{ 
@@ -849,8 +973,8 @@
               <div
                 className={`border inline-block transition-all ${activeInteraction ? 'border-blue-400' : 'border-[#333]'}`}
                 style={{
-                  width: CANVAS_W,
-                  height: CANVAS_H,
+                  width: canvasW,
+                  height: canvasH,
                   transform: `scale(${canvasScale})`,
                   transformOrigin: "top left",
                 }}
@@ -997,7 +1121,7 @@
                   </li>
                   <li>Use arrow keys to nudge by 1 pixel (desktop).</li>
                   <li>
-                    Canvas internal size: {CANVAS_W} × {CANVAS_H} px (preview
+                    Canvas internal size: {canvasW} × {canvasH} px (preview
                     scaled down).
                   </li>
                   <li>Background color: {BG_COLOR}.</li>
