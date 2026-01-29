@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Detail Preserve Image Resizer (standalone)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+    <title>Gemini Image Outpaint Prepper - Mobile Ready</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -15,10 +15,46 @@
               "border-dark": "#333333",
               "bg-input": "#0b0b0b",
             },
+            animation: {
+              'fade-in': 'fadeIn 0.3s ease-in-out',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            }
           },
         },
       };
     </script>
+    <style>
+      /* Custom scrollbar for better mobile experience */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1a1a1a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #444;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+      
+      /* Smooth transitions */
+      * {
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* Better touch feedback */
+      button:active {
+        transform: scale(0.98);
+      }
+    </style>
     <!-- React, ReactDOM and Babel from unpkg (online). If you prefer to run behind a server, use the build option. -->
     <script
       crossorigin
@@ -48,6 +84,7 @@
         const containerRef = useRef(null);
         const canvasRef = useRef(null);
         const [canvasScale, setCanvasScale] = useState(0.25);
+        const [canvasMaxHeight, setCanvasMaxHeight] = useState("70vh");
 
         const [imageObj, setImageObj] = useState(null);
         const [overlayObj, setOverlayObj] = useState(null);
@@ -67,6 +104,7 @@
         const [resizeAlgorithm, setResizeAlgorithm] =
           useState("detail-preserve");
         const [isProcessing, setIsProcessing] = useState(false);
+        const [activeInteraction, setActiveInteraction] = useState(false);
 
         // ---- DPI override state + effect ----
         const [dpiOverride, setDpiOverride] = useState(""); // empty = disabled
@@ -163,8 +201,10 @@
               imgState.w,
               imgState.h,
             );
+            
+            // Image border
             ctx.strokeStyle = "rgba(255,255,255,0.9)";
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.strokeRect(
               imgState.x + 0.5,
               imgState.y + 0.5,
@@ -172,15 +212,17 @@
               imgState.h,
             );
 
-            const handleSize = 36;
+            // Larger handles for better touch support
+            const handleSize = 48;
             const corners = [
               [imgState.x, imgState.y, "nw"],
               [imgState.x + imgState.w, imgState.y, "ne"],
               [imgState.x, imgState.y + imgState.h, "sw"],
               [imgState.x + imgState.w, imgState.y + imgState.h, "se"],
             ];
-            ctx.fillStyle = "rgba(0,0,0,0.6)";
+            ctx.fillStyle = "rgba(0,0,0,0.7)";
             ctx.strokeStyle = "white";
+            ctx.lineWidth = 3;
             corners.forEach(([cx, cy]) => {
               ctx.beginPath();
               ctx.rect(
@@ -195,11 +237,20 @@
 
             ctx.restore();
           } else {
+            // Empty state
             ctx.fillStyle = "rgba(0,0,0,0.25)";
             ctx.fillRect(24, 24, CANVAS_W - 48, CANVAS_H - 48);
             ctx.fillStyle = "white";
+            ctx.font = "bold 48px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("Upload an Image", CANVAS_W / 2, CANVAS_H / 2 - 100);
             ctx.font = "24px sans-serif";
-            ctx.fillText("Drop or upload an image to start", 40, 64);
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            ctx.fillText("Click 'Choose File' to get started", CANVAS_W / 2, CANVAS_H / 2 - 40);
+            ctx.font = "20px sans-serif";
+            ctx.fillText("Drag and resize your image", CANVAS_W / 2, CANVAS_H / 2 + 20);
+            ctx.fillText("Works on mobile and desktop", CANVAS_W / 2, CANVAS_H / 2 + 60);
+            ctx.textAlign = "left";
           }
 
           if (showOverlay && overlayObj) {
@@ -225,9 +276,23 @@
           const rect = canvas.getBoundingClientRect();
           const scaleX = canvas.width / rect.width;
           const scaleY = canvas.height / rect.height;
+          
+          // Handle both mouse and touch events
+          let clientX, clientY;
+          if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+          } else if (e.changedTouches && e.changedTouches.length > 0) {
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+          } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+          }
+          
           return {
-            x: Math.round((e.clientX - rect.left) * scaleX),
-            y: Math.round((e.clientY - rect.top) * scaleY),
+            x: Math.round((clientX - rect.left) * scaleX),
+            y: Math.round((clientY - rect.top) * scaleY),
           };
         };
 
@@ -236,8 +301,15 @@
 
         const handleMouseDown = (e) => {
           if (!imageObj) return;
+          
+          // Prevent default to stop scrolling on touch devices
+          if (e.type === 'touchstart') {
+            e.preventDefault();
+          }
+          
           const pos = getMousePos(e);
-          const hs = 18;
+          // Match the larger handle size for better touch support
+          const hs = 24;
           const corners = [
             { cx: imgState.x, cy: imgState.y, name: "nw" },
             { cx: imgState.x + imgState.w, cy: imgState.y, name: "ne" },
@@ -254,6 +326,7 @@
             ) {
               setResizingHandle(c.name);
               setDragging(false);
+              setActiveInteraction(true);
               return;
             }
           }
@@ -269,12 +342,19 @@
           ) {
             setDragging(true);
             setResizingHandle(null);
+            setActiveInteraction(true);
             setDragOffset({ dx: pos.x - imgState.x, dy: pos.y - imgState.y });
           }
         };
 
         const handleMouseMove = (e) => {
           if (!imageObj) return;
+          
+          // Prevent default to stop scrolling on touch devices when dragging/resizing
+          if ((dragging || resizingHandle) && e.type === 'touchmove') {
+            e.preventDefault();
+          }
+          
           const pos = getMousePos(e);
           if (dragging) {
             const nx = pos.x - dragOffset.dx;
@@ -332,18 +412,33 @@
         const handleMouseUp = () => {
           setDragging(false);
           setResizingHandle(null);
+          setActiveInteraction(false);
         };
 
         useEffect(() => {
           const canvas = canvasRef.current;
           if (!canvas) return;
+          
+          // Mouse events
           canvas.addEventListener("mousedown", handleMouseDown);
           window.addEventListener("mousemove", handleMouseMove);
           window.addEventListener("mouseup", handleMouseUp);
+          
+          // Touch events
+          canvas.addEventListener("touchstart", handleMouseDown, { passive: false });
+          window.addEventListener("touchmove", handleMouseMove, { passive: false });
+          window.addEventListener("touchend", handleMouseUp);
+          window.addEventListener("touchcancel", handleMouseUp);
+          
           return () => {
             canvas.removeEventListener("mousedown", handleMouseDown);
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
+            
+            canvas.removeEventListener("touchstart", handleMouseDown);
+            window.removeEventListener("touchmove", handleMouseMove);
+            window.removeEventListener("touchend", handleMouseUp);
+            window.removeEventListener("touchcancel", handleMouseUp);
           };
         }, [
           imageObj,
@@ -392,30 +487,41 @@
             if (availableWidth < 400) {
               // Very small screens (mobile) - scale to fit width with some margin
               scale = Math.max(
-                0.08,
-                Math.min(0.12, (availableWidth * 0.9) / CANVAS_W),
+                0.09,
+                Math.min(0.13, (availableWidth * 0.95) / CANVAS_W),
               );
             } else if (availableWidth < 640) {
               // Small mobile screens
               scale = Math.max(
-                0.12,
-                Math.min(0.18, (availableWidth * 0.85) / CANVAS_W),
+                0.13,
+                Math.min(0.19, (availableWidth * 0.9) / CANVAS_W),
               );
             } else if (availableWidth < 768) {
               // Tablets
               scale = Math.max(
-                0.15,
-                Math.min(0.2, (availableWidth * 0.8) / CANVAS_W),
+                0.16,
+                Math.min(0.22, (availableWidth * 0.85) / CANVAS_W),
               );
             } else if (availableWidth < 1024) {
               // Medium screens
-              scale = 0.2;
+              scale = 0.22;
             } else {
               // Large screens (desktop)
               scale = 0.25;
             }
 
             setCanvasScale(scale);
+
+            // Calculate max height based on scaled canvas height
+            const scaledHeight = CANVAS_H * scale;
+            const viewportHeight = window.innerHeight;
+
+            // Use 80% of viewport height, or scaled canvas height + 100px padding, whichever is smaller
+            const maxHeightVh = Math.min(
+              80,
+              ((scaledHeight + 100) / viewportHeight) * 100,
+            );
+            setCanvasMaxHeight(`${Math.max(50, Math.min(maxHeightVh, 80))}vh`);
           };
 
           calculateScale();
@@ -645,23 +751,31 @@
         };
 
         return (
-          <div ref={containerRef} className="p-4 sm:p-6 max-w-full">
-            <div className="flex flex-col sm:flex-row gap-4 mb-4 items-start sm:items-center flex-wrap">
-              <label className="flex items-center gap-2 text-sm sm:text-base">
+          <div ref={containerRef} className="p-3 sm:p-4 md:p-6 max-w-full">
+            <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center sm:text-left">Gemini Image Outpaint Prepper</h1>
+            {imageObj && (
+              <div className="mb-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded-lg sm:hidden animate-fade-in">
+                <p className="text-sm text-blue-200">
+                  <strong>Touch Mode Active:</strong> Tap and drag the image to move it. Use corner handles to resize.
+                </p>
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 items-stretch sm:items-center flex-wrap">
+              <label className="flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto">
                 <input
                   type="file"
                   accept="image/*"
                   onChange={onFile}
-                  className="text-sm sm:text-base cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600"
+                  className="text-sm sm:text-base cursor-pointer w-full file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 active:file:bg-slate-500 file:transition-colors file:cursor-pointer file:min-h-[44px] sm:file:min-h-0"
                 />
               </label>
 
-              <label className="flex items-center gap-2 text-sm sm:text-base cursor-pointer">
+              <label className="flex items-center gap-2 text-sm sm:text-base cursor-pointer min-h-[44px] sm:min-h-0">
                 <input
                   type="checkbox"
                   checked={keepAspect}
                   onChange={(e) => setKeepAspect(e.target.checked)}
-                  className="cursor-pointer"
+                  className="cursor-pointer w-5 h-5 sm:w-4 sm:h-4"
                 />
                 <span>Keep aspect ratio</span>
               </label>
@@ -671,7 +785,7 @@
                 <select
                   value={resizeAlgorithm}
                   onChange={(e) => setResizeAlgorithm(e.target.value)}
-                  className="px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] cursor-pointer text-sm sm:text-base"
+                  className="px-2 py-2 sm:py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] cursor-pointer text-sm sm:text-base min-h-[44px] sm:min-h-0 w-full sm:w-auto"
                 >
                   <option value="detail-preserve">
                     Detail-preserving (approx)
@@ -681,33 +795,41 @@
               </label>
 
               <button
-                className="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white text-sm sm:text-base transition-colors"
+                className="px-4 py-2 sm:py-1.5 rounded bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white text-sm sm:text-base transition-colors min-h-[44px] sm:min-h-0"
                 onClick={centerHorizontally}
               >
-                Center horizontally
+                Center H
               </button>
               <button
-                className="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white text-sm sm:text-base transition-colors"
+                className="px-4 py-2 sm:py-1.5 rounded bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white text-sm sm:text-base transition-colors min-h-[44px] sm:min-h-0"
                 onClick={centerVertically}
               >
-                Center vertically
+                Center V
               </button>
               <button
-                className="px-3 py-1.5 rounded bg-green-700 hover:bg-green-600 text-white text-sm sm:text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 sm:py-1.5 rounded bg-green-700 hover:bg-green-600 active:bg-green-500 text-white text-sm sm:text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 relative"
                 onClick={downloadPNG}
                 disabled={!imageObj || isProcessing}
               >
-                {isProcessing ? "Processing..." : "Download PNG"}
+                {isProcessing ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </span>
+                ) : "Download PNG"}
               </button>
             </div>
 
             <div className="mb-4">
-              <label className="flex items-center gap-2 text-sm sm:text-base cursor-pointer">
+              <label className="flex items-center gap-2 text-sm sm:text-base cursor-pointer min-h-[44px] sm:min-h-0">
                 <input
                   type="checkbox"
                   checked={showOverlay}
                   onChange={(e) => setShowOverlay(e.target.checked)}
-                  className="cursor-pointer"
+                  className="cursor-pointer w-5 h-5 sm:w-4 sm:h-4"
                 />
                 <span>Show overlay guide</span>
               </label>
@@ -718,11 +840,14 @@
             </div>
 
             <div
-              className="border border-[#333] w-full overflow-auto -mx-4 sm:mx-0 px-2 sm:px-0 touch-pan-x touch-pan-y"
-              style={{ maxHeight: "100dvh" }}
+              className={`border border-[#333] w-full overflow-auto -mx-4 sm:mx-0 px-2 sm:px-0 transition-all ${activeInteraction ? 'border-blue-500' : ''}`}
+              style={{ 
+                maxHeight: canvasMaxHeight,
+                touchAction: imageObj ? 'none' : 'auto'
+              }}
             >
               <div
-                className="border border-[#333] inline-block"
+                className={`border inline-block transition-all ${activeInteraction ? 'border-blue-400' : 'border-[#333]'}`}
                 style={{
                   width: CANVAS_W,
                   height: CANVAS_H,
@@ -732,8 +857,12 @@
               >
                 <canvas
                   ref={canvasRef}
-                  className="block cursor-move"
-                  style={{ background: BG_COLOR }}
+                  className="block"
+                  style={{ 
+                    background: BG_COLOR,
+                    touchAction: 'none',
+                    cursor: dragging ? 'grabbing' : (resizingHandle ? 'nwse-resize' : (imageObj ? 'grab' : 'default'))
+                  }}
                 />
               </div>
             </div>
@@ -747,7 +876,7 @@
                   <label className="flex items-center gap-1 text-sm sm:text-base">
                     X:{" "}
                     <input
-                      className="ml-1 w-20 sm:w-24 px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm"
+                      className="ml-1 w-20 sm:w-24 px-2 py-2 sm:py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm min-h-[44px] sm:min-h-0"
                       type="number"
                       value={imgState.x}
                       onChange={(e) =>
@@ -761,7 +890,7 @@
                   <label className="flex items-center gap-1 text-sm sm:text-base">
                     Y:{" "}
                     <input
-                      className="ml-1 w-20 sm:w-24 px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm"
+                      className="ml-1 w-20 sm:w-24 px-2 py-2 sm:py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm min-h-[44px] sm:min-h-0"
                       type="number"
                       value={imgState.y}
                       onChange={(e) =>
@@ -775,7 +904,7 @@
                   <label className="flex items-center gap-1 text-sm sm:text-base">
                     W:{" "}
                     <input
-                      className="ml-1 w-20 sm:w-24 px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm"
+                      className="ml-1 w-20 sm:w-24 px-2 py-2 sm:py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm min-h-[44px] sm:min-h-0"
                       type="number"
                       value={imgState.w}
                       onChange={(e) => {
@@ -793,7 +922,7 @@
                   <label className="flex items-center gap-1 text-sm sm:text-base">
                     H:{" "}
                     <input
-                      className="ml-1 w-20 sm:w-24 px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm"
+                      className="ml-1 w-20 sm:w-24 px-2 py-2 sm:py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm min-h-[44px] sm:min-h-0"
                       type="number"
                       value={imgState.h}
                       onChange={(e) => {
@@ -820,14 +949,14 @@
                       placeholder="300"
                       value={dpiOverride}
                       onChange={(e) => setDpiOverride(e.target.value)}
-                      className="ml-2 px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm w-20 sm:w-24"
+                      className="ml-2 px-2 py-2 sm:py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] text-sm w-20 sm:w-24 min-h-[44px] sm:min-h-0"
                       title="Scale = 1200 / DPI. Scryfall scans are always 300 dpi."
                     />
                   </label>
 
                   <button
                     type="button"
-                    className="px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] text-sm transition-colors cursor-pointer"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
                     onClick={() => setDpiOverride(270)}
                     title="Apply 270 DPI (≈444%)"
                   >
@@ -836,20 +965,20 @@
 
                   <button
                     type="button"
-                    className="px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] text-sm transition-colors cursor-pointer"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
                     onClick={() => setDpiOverride(300)}
                     title="Apply 300 DPI (400%) — Scryfall"
                   >
                     300 DPI
                   </button>
 
-                  <span className="text-xs sm:text-sm text-gray-400">
+                  <span className="text-xs sm:text-sm text-gray-400 self-center">
                     scryfall scans are always 300 dpi
                   </span>
 
                   <button
                     type="button"
-                    className="px-2 py-1 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] text-sm transition-colors cursor-pointer"
+                    className="px-3 py-2 rounded border border-[#333] bg-[#1a1a1a] text-[#eee] hover:bg-[#2a2a2a] active:bg-[#3a3a3a] text-sm transition-colors cursor-pointer min-h-[44px] sm:min-h-0"
                     onClick={() => setDpiOverride("")}
                   >
                     Clear
@@ -863,10 +992,10 @@
                 </h4>
                 <ul className="list-disc ml-5 mt-2 text-xs sm:text-sm space-y-1">
                   <li>
-                    Click and drag image to move it; use corner handles to
+                    Click/tap and drag image to move it; use corner handles to
                     resize.
                   </li>
-                  <li>Use arrow keys to nudge by 1 pixel.</li>
+                  <li>Use arrow keys to nudge by 1 pixel (desktop).</li>
                   <li>
                     Canvas internal size: {CANVAS_W} × {CANVAS_H} px (preview
                     scaled down).
@@ -879,6 +1008,10 @@
                   <li>
                     Overlay (if shown) is a visual guide only and won't be
                     exported.
+                  </li>
+                  <li>
+                    Mobile: Touch anywhere on the image to drag, or use corner
+                    handles to resize. Scroll is disabled while image is loaded.
                   </li>
                 </ul>
               </div>
@@ -941,7 +1074,7 @@ Confirmation: Respond only with: "Universal Neutral Extension Mode Locked. Ready
           </div>
           <div class="self-end sm:self-end mt-2 sm:mt-0">
             <button
-              class="copy-btn px-3 sm:px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 text-white cursor-pointer text-sm sm:text-base transition-colors"
+              class="copy-btn px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm sm:text-base transition-colors min-h-[44px]"
               data-target="outpaint-1"
             >
               Copy
@@ -973,7 +1106,7 @@ Strict Directives:
           </div>
           <div class="self-end sm:self-end mt-2 sm:mt-0">
             <button
-              class="copy-btn px-3 sm:px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 text-white cursor-pointer text-sm sm:text-base transition-colors"
+              class="copy-btn px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm sm:text-base transition-colors min-h-[44px]"
               data-target="outpaint-2"
             >
               Copy
