@@ -5,6 +5,7 @@ A web-based image preparation tool for preparing images (especially Magic: The G
 ## Overview
 
 This tool provides a canvas-based interface where you can:
+
 - Upload and position images on a fixed-size canvas (3264 × 4440 px)
 - Resize images with detail-preserving algorithms
 - Apply DPI-based scaling (with presets for Scryfall's 300 DPI scans)
@@ -21,6 +22,8 @@ The application runs as a standalone HTML file served via nginx in a Docker cont
 - **Keyboard Controls**: Arrow keys for pixel-perfect positioning
 - **Aspect Ratio Lock**: Maintain original image proportions
 - **Centering Tools**: Quick horizontal and vertical centering buttons
+- **Mobile Responsive**: Fully responsive design that works seamlessly on mobile devices, tablets, and desktops
+- **Modern UI**: Built with Tailwind CSS for a clean, consistent, and accessible interface
 
 ## Canvas Specifications
 
@@ -31,6 +34,7 @@ The application runs as a standalone HTML file served via nginx in a Docker cont
 ## DPI Scaling
 
 The tool includes DPI-based scaling functionality:
+
 - **Formula**: Scale = 1200 / DPI
 - **Scryfall Preset**: 300 DPI (400% scale) - Scryfall scans are always 300 DPI
 - **270 DPI Preset**: ≈444% scale
@@ -73,6 +77,12 @@ docker run -d -p 6622:80 --name gemini-image-prepper gemini-image-prepper
 - **Port**: 6622 (mapped to container port 80)
 - **File**: `gemini-outpaint-prepper.html` served as `index.html`
 - **Container Restart Policy**: `unless-stopped`
+- **Styling**: Tailwind CSS (via CDN) for responsive, modern UI
+- **Framework**: React 18 with JSX transpiled via Babel Standalone
+- **Responsive Breakpoints**:
+  - Mobile: Default styles
+  - Small screens (`sm:`): 640px and up
+  - Large screens (`lg:`): 1024px and up
 
 ## Notes
 
@@ -80,3 +90,5 @@ docker run -d -p 6622:80 --name gemini-image-prepper gemini-image-prepper
 - The preview is scaled down to 25% for display purposes
 - The canvas maintains a fixed size optimized for Gemini image processing
 - Background color is embedded in the exported PNG
+- The interface adapts to different screen sizes with responsive layouts and typography
+- All interactive elements include hover states and smooth transitions for better UX
