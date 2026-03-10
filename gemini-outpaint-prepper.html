@@ -68,6 +68,7 @@
       src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"
     ></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/ag-psd@30.1.0/dist/bundle.js"></script>
   </head>
   <body class="m-0 font-sans bg-[#111] text-[#eee]">
     <div id="root"></div>
@@ -1612,8 +1613,756 @@
         );
       }
 
+      function ImageMerger() {
+        const canvasRef = useRef(null);
+        const [ogImage, setOgImage] = useState(null);
+        const [outpaintImage, setOutpaintImage] = useState(null);
+        const [guideImage, setGuideImage] = useState(null);
+        const [canvasW, setCanvasW] = useState(800);
+        const [canvasH, setCanvasH] = useState(600);
+        const [canvasScale, setCanvasScale] = useState(0.25);
+        const [ogState, setOgState] = useState({ x: 0, y: 0, w: 0, h: 0 });
+        const [featherStrength, setFeatherStrength] = useState(40);
+        const [layers, setLayers] = useState({
+          og: true,
+          outpaint: true,
+          guide: false,
+          mask: false,
+          border: true,
+        });
+        const [dragging, setDragging] = useState(false);
+        const [dragOffset, setDragOffset] = useState({ dx: 0, dy: 0 });
+        const [isProcessing, setIsProcessing] = useState(false);
+        const [alignmentStatus, setAlignmentStatus] = useState("");
+
+        // Step 1: Upload OG image — canvas = OG natural size, OG at (0,0)
+        const onOgFile = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const img = new Image();
+          img.onload = () => {
+            setOgImage(img);
+            const w = img.naturalWidth;
+            const h = img.naturalHeight;
+            setCanvasW(w);
+            setCanvasH(h);
+            setOgState({ x: 0, y: 0, w, h });
+            setAlignmentStatus(`OG loaded: ${w}x${h}px. Now upload the prepper output (gray-bordered guide).`);
+          };
+          img.src = URL.createObjectURL(file);
+        };
+
+        // Step 2: Upload prepper/guide image — detect OG bounding box in guide,
+        // expand canvas so OG fits at its natural size within the larger frame
+        const onGuideFile = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const img = new Image();
+          img.onload = () => {
+            setGuideImage(img);
+            analyzeGuideAndExpand(img);
+          };
+          img.src = URL.createObjectURL(file);
+        };
+
+        const analyzeGuideAndExpand = (guide) => {
+          if (!ogImage) {
+            setAlignmentStatus("Upload OG image first.");
+            return;
+          }
+          setAlignmentStatus("Analyzing guide image...");
+
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = guide.naturalWidth;
+          tempCanvas.height = guide.naturalHeight;
+          const ctx = tempCanvas.getContext("2d");
+          ctx.drawImage(guide, 0, 0);
+          const data = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
+
+          const threshold = 12;
+          let minX = tempCanvas.width, minY = tempCanvas.height, maxX = 0, maxY = 0;
+          let found = false;
+
+          for (let y = 0; y < tempCanvas.height; y++) {
+            for (let x = 0; x < tempCanvas.width; x++) {
+              const i = (y * tempCanvas.width + x) * 4;
+              const r = data[i], g = data[i + 1], b = data[i + 2];
+              if (Math.abs(r - 128) > threshold || Math.abs(g - 128) > threshold || Math.abs(b - 128) > threshold) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+                found = true;
+              }
+            }
+          }
+
+          if (!found) {
+            setAlignmentStatus("Could not detect non-gray region in guide image.");
+            return;
+          }
+
+          // Bounding box of non-gray region in guide pixels
+          const bboxW = maxX - minX + 1;
+          const bboxH = maxY - minY + 1;
+
+          // The OG occupies bboxW/guideW of the guide horizontally, same vertically.
+          // We keep OG at its natural pixel size and scale the canvas up proportionally.
+          const ogW = ogImage.naturalWidth;
+          const ogH = ogImage.naturalHeight;
+
+          // Canvas = OG size scaled by the inverse of the bbox ratio
+          const newCanvasW = Math.round(ogW * (guide.naturalWidth / bboxW));
+          const newCanvasH = Math.round(ogH * (guide.naturalHeight / bboxH));
+
+          // OG position = where the bbox starts, scaled to new canvas
+          const newX = Math.round((minX / guide.naturalWidth) * newCanvasW);
+          const newY = Math.round((minY / guide.naturalHeight) * newCanvasH);
+
+          setCanvasW(newCanvasW);
+          setCanvasH(newCanvasH);
+          setOgState({ x: newX, y: newY, w: ogW, h: ogH });
+          setAlignmentStatus(
+            `Canvas expanded to ${newCanvasW}x${newCanvasH}. OG placed at (${newX}, ${newY}). Now upload the Gemini outpaint.`
+          );
+        };
+
+        // Step 3: Upload Gemini outpaint — placed as background layer
+        const onOutpaintFile = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const img = new Image();
+          img.onload = () => {
+            setOutpaintImage(img);
+            setAlignmentStatus("Outpaint loaded as background. Toggle layers to compare alignment.");
+          };
+          img.src = URL.createObjectURL(file);
+        };
+
+        // Feathered mask compositing — fixed: transparent base so alpha fades properly
+        const applyFeatheredMask = useCallback((ctx, ogImg, x, y, w, h, feather) => {
+          const temp = document.createElement("canvas");
+          temp.width = w;
+          temp.height = h;
+          const tctx = temp.getContext("2d");
+
+          // Draw OG image
+          tctx.drawImage(ogImg, 0, 0, ogImg.naturalWidth, ogImg.naturalHeight, 0, 0, w, h);
+
+          if (feather <= 0) {
+            // No feathering, draw directly
+            ctx.drawImage(temp, x, y);
+            return;
+          }
+
+          // Create feather mask on a TRANSPARENT canvas (not black-filled!)
+          // destination-in uses the ALPHA channel — only transparent vs opaque matters
+          const mask = document.createElement("canvas");
+          mask.width = w;
+          mask.height = h;
+          const mctx = mask.getContext("2d");
+          // Canvas starts transparent — that's the key fix
+
+          const inset = feather;
+          if (inset * 2 < w && inset * 2 < h) {
+            mctx.filter = `blur(${feather / 2}px)`;
+            mctx.fillStyle = "white";
+            mctx.fillRect(inset, inset, w - inset * 2, h - inset * 2);
+            mctx.filter = "none";
+          } else {
+            // Feather too large relative to image, just show full
+            mctx.fillStyle = "white";
+            mctx.fillRect(0, 0, w, h);
+          }
+
+          // Apply mask: keeps OG pixels where mask is opaque, fades where mask is transparent
+          tctx.globalCompositeOperation = "destination-in";
+          tctx.drawImage(mask, 0, 0);
+          tctx.globalCompositeOperation = "source-over";
+
+          ctx.drawImage(temp, x, y);
+        }, []);
+
+        // Draw preview
+        const drawPreview = useCallback(() => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const ctx = canvas.getContext("2d");
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#808080";
+          ctx.fillRect(0, 0, canvasW, canvasH);
+
+          // Outpaint background (scaled to canvas)
+          if (layers.outpaint && outpaintImage) {
+            ctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
+          }
+
+          // OG with feathered mask
+          if (layers.og && ogImage && ogState.w > 0) {
+            applyFeatheredMask(ctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+          }
+
+          // Mask preview overlay (B/W visualization)
+          if (layers.mask && ogState.w > 0) {
+            const mask = document.createElement("canvas");
+            mask.width = canvasW;
+            mask.height = canvasH;
+            const mctx = mask.getContext("2d");
+            // Black background for mask preview
+            mctx.fillStyle = "black";
+            mctx.fillRect(0, 0, canvasW, canvasH);
+            const inset = featherStrength;
+            const mw = ogState.w;
+            const mh = ogState.h;
+            if (inset * 2 < mw && inset * 2 < mh) {
+              mctx.filter = `blur(${featherStrength / 2}px)`;
+              mctx.fillStyle = "white";
+              mctx.fillRect(ogState.x + inset, ogState.y + inset, mw - inset * 2, mh - inset * 2);
+              mctx.filter = "none";
+            } else {
+              mctx.fillStyle = "white";
+              mctx.fillRect(ogState.x, ogState.y, mw, mh);
+            }
+            ctx.globalAlpha = 0.5;
+            ctx.drawImage(mask, 0, 0);
+            ctx.globalAlpha = 1.0;
+          }
+
+          // Guide overlay
+          if (layers.guide && guideImage) {
+            ctx.globalAlpha = 0.4;
+            ctx.drawImage(guideImage, 0, 0, canvasW, canvasH);
+            ctx.globalAlpha = 1.0;
+          }
+
+          // OG border indicator
+          if (layers.border && ogImage && ogState.w > 0) {
+            ctx.strokeStyle = "rgba(0,255,128,0.7)";
+            ctx.lineWidth = 3;
+            ctx.setLineDash([10, 5]);
+            ctx.strokeRect(ogState.x, ogState.y, ogState.w, ogState.h);
+            ctx.setLineDash([]);
+          }
+        }, [ogImage, outpaintImage, guideImage, ogState, layers, canvasW, canvasH, featherStrength, applyFeatheredMask]);
+
+        // Canvas size + redraw
+        useEffect(() => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          canvas.width = canvasW;
+          canvas.height = canvasH;
+          drawPreview();
+        }, [drawPreview, canvasW, canvasH]);
+
+        useEffect(() => drawPreview(), [drawPreview, ogState, layers, featherStrength]);
+
+        // Responsive scaling
+        useEffect(() => {
+          const calculateScale = () => {
+            const windowWidth = window.innerWidth;
+            const padding = 48;
+            const availableWidth = windowWidth - padding;
+            let scale = 0.25;
+            if (availableWidth < 400) {
+              scale = Math.max(0.09, Math.min(0.13, (availableWidth * 0.95) / canvasW));
+            } else if (availableWidth < 640) {
+              scale = Math.max(0.13, Math.min(0.19, (availableWidth * 0.9) / canvasW));
+            } else if (availableWidth < 768) {
+              scale = Math.max(0.16, Math.min(0.22, (availableWidth * 0.85) / canvasW));
+            } else if (availableWidth < 1024) {
+              scale = 0.22;
+            } else {
+              scale = 0.25;
+            }
+            setCanvasScale(scale);
+          };
+          calculateScale();
+          window.addEventListener("resize", calculateScale);
+          return () => window.removeEventListener("resize", calculateScale);
+        }, [canvasW]);
+
+        // Mouse/touch handlers for dragging OG
+        const getMousePos = (e) => {
+          const canvas = canvasRef.current;
+          const rect = canvas.getBoundingClientRect();
+          const scaleX = canvas.width / rect.width;
+          const scaleY = canvas.height / rect.height;
+          let clientX, clientY;
+          if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+          } else if (e.changedTouches && e.changedTouches.length > 0) {
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+          } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+          }
+          return {
+            x: Math.round((clientX - rect.left) * scaleX),
+            y: Math.round((clientY - rect.top) * scaleY),
+          };
+        };
+
+        const pointInRect = (px, py, rx, ry, rw, rh) =>
+          px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
+
+        const handleMouseDown = (e) => {
+          if (!ogImage) return;
+          if (e.type === "touchstart") e.preventDefault();
+          const pos = getMousePos(e);
+          if (pointInRect(pos.x, pos.y, ogState.x, ogState.y, ogState.w, ogState.h)) {
+            setDragging(true);
+            setDragOffset({ dx: pos.x - ogState.x, dy: pos.y - ogState.y });
+          }
+        };
+
+        const handleMouseMove = (e) => {
+          if (!dragging) return;
+          if (e.type === "touchmove") e.preventDefault();
+          const pos = getMousePos(e);
+          setOgState((s) => ({
+            ...s,
+            x: pos.x - dragOffset.dx,
+            y: pos.y - dragOffset.dy,
+          }));
+        };
+
+        const handleMouseUp = () => setDragging(false);
+
+        useEffect(() => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          canvas.addEventListener("mousedown", handleMouseDown);
+          window.addEventListener("mousemove", handleMouseMove);
+          window.addEventListener("mouseup", handleMouseUp);
+          canvas.addEventListener("touchstart", handleMouseDown, { passive: false });
+          window.addEventListener("touchmove", handleMouseMove, { passive: false });
+          window.addEventListener("touchend", handleMouseUp);
+          window.addEventListener("touchcancel", handleMouseUp);
+          return () => {
+            canvas.removeEventListener("mousedown", handleMouseDown);
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+            canvas.removeEventListener("touchstart", handleMouseDown);
+            window.removeEventListener("touchmove", handleMouseMove);
+            window.removeEventListener("touchend", handleMouseUp);
+            window.removeEventListener("touchcancel", handleMouseUp);
+          };
+        }, [ogImage, dragging, dragOffset, ogState]);
+
+        // Arrow key nudging
+        useEffect(() => {
+          const onKey = (ev) => {
+            if (!ogImage) return;
+            if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) {
+              ev.preventDefault();
+              setOgState((s) => {
+                if (ev.key === "ArrowLeft") return { ...s, x: s.x - 1 };
+                if (ev.key === "ArrowRight") return { ...s, x: s.x + 1 };
+                if (ev.key === "ArrowUp") return { ...s, y: s.y - 1 };
+                if (ev.key === "ArrowDown") return { ...s, y: s.y + 1 };
+                return s;
+              });
+            }
+          };
+          window.addEventListener("keydown", onKey);
+          return () => window.removeEventListener("keydown", onKey);
+        }, [ogImage]);
+
+        // Export: Merged PNG
+        const downloadMerged = () => {
+          if (!outpaintImage) return;
+          setIsProcessing(true);
+          const final = document.createElement("canvas");
+          final.width = canvasW;
+          final.height = canvasH;
+          const fctx = final.getContext("2d");
+          fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
+          if (ogImage && ogState.w > 0) {
+            applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+          }
+          final.toBlob((blob) => {
+            if (!blob) { setIsProcessing(false); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "merged-outpaint.png";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            setIsProcessing(false);
+          }, "image/png");
+        };
+
+        // Export: OG on transparent
+        const downloadOgTransparent = () => {
+          if (!ogImage) return;
+          setIsProcessing(true);
+          const final = document.createElement("canvas");
+          final.width = canvasW;
+          final.height = canvasH;
+          const fctx = final.getContext("2d");
+          applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+          final.toBlob((blob) => {
+            if (!blob) { setIsProcessing(false); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "og-transparent.png";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            setIsProcessing(false);
+          }, "image/png");
+        };
+
+        // Export: B/W feather mask
+        const downloadMask = () => {
+          if (!ogImage) return;
+          setIsProcessing(true);
+          const final = document.createElement("canvas");
+          final.width = canvasW;
+          final.height = canvasH;
+          const fctx = final.getContext("2d");
+          fctx.fillStyle = "black";
+          fctx.fillRect(0, 0, canvasW, canvasH);
+          const inset = featherStrength;
+          const mw = ogState.w;
+          const mh = ogState.h;
+          if (inset * 2 < mw && inset * 2 < mh) {
+            fctx.filter = `blur(${featherStrength / 2}px)`;
+            fctx.fillStyle = "white";
+            fctx.fillRect(ogState.x + inset, ogState.y + inset, mw - inset * 2, mh - inset * 2);
+            fctx.filter = "none";
+          }
+          final.toBlob((blob) => {
+            if (!blob) { setIsProcessing(false); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "feather-mask.png";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            setIsProcessing(false);
+          }, "image/png");
+        };
+
+        // Export: Outpaint background only
+        const downloadOutpaint = () => {
+          if (!outpaintImage) return;
+          setIsProcessing(true);
+          const final = document.createElement("canvas");
+          final.width = canvasW;
+          final.height = canvasH;
+          const fctx = final.getContext("2d");
+          fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
+          final.toBlob((blob) => {
+            if (!blob) { setIsProcessing(false); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "outpaint-background.png";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            setIsProcessing(false);
+          }, "image/png");
+        };
+
+        // Export: Layered PSD file
+        const downloadPsd = () => {
+          if (!outpaintImage) return;
+          if (!window.agPsd) { alert("PSD library failed to load. Check your internet connection and refresh."); return; }
+          setIsProcessing(true);
+
+          setTimeout(() => {
+            try {
+              const children = [];
+
+              // Layer 1 (bottom): Outpaint Background
+              const outpaintCanvas = document.createElement("canvas");
+              outpaintCanvas.width = canvasW;
+              outpaintCanvas.height = canvasH;
+              const octx = outpaintCanvas.getContext("2d");
+              octx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
+
+              children.push({
+                name: "Outpaint Background",
+                canvas: outpaintCanvas,
+                left: 0,
+                top: 0,
+              });
+
+              if (ogImage && ogState.w > 0) {
+                // Layer 2: OG Card (Feathered)
+                const ogCanvas = document.createElement("canvas");
+                ogCanvas.width = canvasW;
+                ogCanvas.height = canvasH;
+                const ogCtx = ogCanvas.getContext("2d");
+                applyFeatheredMask(ogCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+
+                children.push({
+                  name: "OG Card (Feathered)",
+                  canvas: ogCanvas,
+                  left: 0,
+                  top: 0,
+                });
+
+                // Layer 3: Feather Mask (hidden)
+                const maskCanvas = document.createElement("canvas");
+                maskCanvas.width = canvasW;
+                maskCanvas.height = canvasH;
+                const mctx = maskCanvas.getContext("2d");
+                mctx.fillStyle = "black";
+                mctx.fillRect(0, 0, canvasW, canvasH);
+                const inset = featherStrength;
+                if (inset * 2 < ogState.w && inset * 2 < ogState.h) {
+                  mctx.filter = `blur(${featherStrength / 2}px)`;
+                  mctx.fillStyle = "white";
+                  mctx.fillRect(ogState.x + inset, ogState.y + inset, ogState.w - inset * 2, ogState.h - inset * 2);
+                  mctx.filter = "none";
+                }
+
+                children.push({
+                  name: "Feather Mask",
+                  canvas: maskCanvas,
+                  left: 0,
+                  top: 0,
+                  hidden: true,
+                });
+              }
+
+              // Layer 4 (top): Merged
+              const mergedCanvas = document.createElement("canvas");
+              mergedCanvas.width = canvasW;
+              mergedCanvas.height = canvasH;
+              const mergedCtx = mergedCanvas.getContext("2d");
+              mergedCtx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
+              if (ogImage && ogState.w > 0) {
+                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+              }
+
+              children.push({
+                name: "Merged",
+                canvas: mergedCanvas,
+                left: 0,
+                top: 0,
+              });
+
+              const psd = {
+                width: canvasW,
+                height: canvasH,
+                children: children,
+              };
+
+              const buffer = agPsd.writePsd(psd);
+              const blob = new Blob([buffer], { type: "application/octet-stream" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "merged-outpaint.psd";
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              console.error("PSD export failed:", err);
+              alert("PSD export failed: " + err.message);
+            } finally {
+              setIsProcessing(false);
+            }
+          }, 50);
+        };
+
+        const toggleLayer = (key) => setLayers((l) => ({ ...l, [key]: !l[key] }));
+
+        return (
+          <div className="p-3 sm:p-4 md:p-6 max-w-full">
+            <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center sm:text-left">
+              Outpaint Merger
+              <span className="italic text-slate-400 ml-2" style={{ fontSize: "66%" }}>
+                Blend OG card back into outpaint
+              </span>
+            </h1>
+
+            {/* File uploads — sequential: OG first, then guide, then outpaint */}
+            <div className="flex flex-col gap-3 mb-4">
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-wrap">
+                <label className="flex flex-col gap-1 text-sm sm:text-base">
+                  <span className="text-slate-300">1. OG Image (original high-quality card)</span>
+                  <input type="file" accept="image/*" onChange={onOgFile}
+                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px]" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm sm:text-base">
+                  <span className={`text-slate-300 ${!ogImage ? "opacity-40" : ""}`}>2. Prepper Output (gray-bordered guide)</span>
+                  <input type="file" accept="image/*" onChange={onGuideFile} disabled={!ogImage}
+                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px] disabled:opacity-40" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm sm:text-base">
+                  <span className={`text-slate-300 ${!guideImage ? "opacity-40" : ""}`}>3. Gemini Outpaint (expanded output)</span>
+                  <input type="file" accept="image/*" onChange={onOutpaintFile} disabled={!guideImage}
+                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px] disabled:opacity-40" />
+                </label>
+              </div>
+              {alignmentStatus && (
+                <div className="text-sm text-emerald-300 bg-emerald-900/30 border border-emerald-500/50 rounded px-3 py-2">
+                  {alignmentStatus}
+                </div>
+              )}
+            </div>
+
+            {/* Controls row */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4 items-stretch sm:items-center flex-wrap">
+              {/* Feather strength */}
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-slate-300 whitespace-nowrap">Feather: {featherStrength}px</span>
+                <input type="range" min="0" max="200" step="1" value={featherStrength}
+                  onChange={(e) => setFeatherStrength(Number(e.target.value))}
+                  className="w-32 sm:w-48 accent-emerald-500" />
+              </label>
+
+              {/* Layer toggles */}
+              <div className="flex items-center gap-3 text-sm flex-wrap">
+                <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
+                  <input type="checkbox" checked={layers.outpaint} onChange={() => toggleLayer("outpaint")} />
+                  <span>Outpaint</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
+                  <input type="checkbox" checked={layers.og} onChange={() => toggleLayer("og")} />
+                  <span>OG Image</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
+                  <input type="checkbox" checked={layers.mask} onChange={() => toggleLayer("mask")} />
+                  <span>Mask Preview</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
+                  <input type="checkbox" checked={layers.guide} onChange={() => toggleLayer("guide")} />
+                  <span>Guide</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
+                  <input type="checkbox" checked={layers.border} onChange={() => toggleLayer("border")} />
+                  <span>Border</span>
+                </label>
+              </div>
+
+              {/* Position display */}
+              {ogImage && (
+                <span className="text-xs text-slate-400">
+                  OG pos: ({ogState.x}, {ogState.y}) | size: {ogState.w}x{ogState.h} | canvas: {canvasW}x{canvasH}
+                </span>
+              )}
+            </div>
+
+            {/* Canvas */}
+            <div
+              className="border border-[#333] rounded-lg overflow-hidden inline-block"
+              style={{
+                width: `${canvasW * canvasScale}px`,
+                height: `${canvasH * canvasScale}px`,
+                maxWidth: "100%",
+              }}
+            >
+              <div
+                style={{
+                  transform: `scale(${canvasScale})`,
+                  transformOrigin: "top left",
+                }}
+              >
+                <canvas
+                  ref={canvasRef}
+                  className="block"
+                  style={{
+                    background: "#808080",
+                    touchAction: "none",
+                    cursor: dragging ? "grabbing" : ogImage ? "grab" : "default",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Export buttons */}
+            <div className="flex flex-col sm:flex-row gap-2 mt-4 flex-wrap">
+              <button onClick={downloadMerged} disabled={!outpaintImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+                {isProcessing ? "Processing..." : "Download Merged PNG"}
+              </button>
+              <button onClick={downloadOgTransparent} disabled={!ogImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+                OG on Transparent
+              </button>
+              <button onClick={downloadMask} disabled={!ogImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+                B/W Feather Mask
+              </button>
+              <button onClick={downloadOutpaint} disabled={!outpaintImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+                Outpaint Background
+              </button>
+              <button onClick={downloadPsd} disabled={!outpaintImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-purple-700 hover:bg-purple-600 active:bg-purple-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+                {isProcessing ? "Processing..." : "Download PSD (Layers)"}
+              </button>
+            </div>
+
+            {/* Instructions */}
+            <div className="mt-4 p-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-slate-400">
+              <p className="mb-1"><strong className="text-slate-200">How to use:</strong></p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Upload the <strong>OG image</strong> — canvas sizes to it</li>
+                <li>Upload the <strong>Prepper output</strong> (gray-bordered image) — canvas expands, OG auto-positioned</li>
+                <li>Upload the <strong>Gemini outpaint</strong> — placed as background layer under OG</li>
+                <li>Fine-tune position by <strong>dragging</strong> or <strong>arrow keys</strong></li>
+                <li>Adjust <strong>feather strength</strong> for seamless edge blending</li>
+                <li>Toggle layers for <strong>A/B comparison</strong></li>
+                <li><strong>Download</strong> the merged result</li>
+              </ol>
+            </div>
+          </div>
+        );
+      }
+
+      function App() {
+        const [page, setPage] = useState(window.location.hash === "#/merger" ? "merger" : "prepper");
+
+        useEffect(() => {
+          const onHash = () => {
+            setPage(window.location.hash === "#/merger" ? "merger" : "prepper");
+          };
+          window.addEventListener("hashchange", onHash);
+          return () => window.removeEventListener("hashchange", onHash);
+        }, []);
+
+        // Show/hide the prompts section based on route
+        useEffect(() => {
+          const el = document.getElementById("simple-outpaint-prompts");
+          if (el) el.style.display = page === "prepper" ? "" : "none";
+        }, [page]);
+
+        return (
+          <div>
+            <nav className="flex gap-1 p-2 bg-[#0a0a0a] border-b border-[#333]">
+              <a href="#/" onClick={() => setPage("prepper")}
+                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "prepper" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>
+                Prepper
+              </a>
+              <a href="#/merger" onClick={() => setPage("merger")}
+                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "merger" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>
+                Merger
+              </a>
+            </nav>
+            {page === "prepper" ? <DetailPreserveImageResizer /> : <ImageMerger />}
+          </div>
+        );
+      }
+
       const root = ReactDOM.createRoot(document.getElementById("root"));
-      root.render(<DetailPreserveImageResizer />);
+      root.render(<App />);
     </script>
     <!-- Simple outpaint prompts (added) -->
     <div

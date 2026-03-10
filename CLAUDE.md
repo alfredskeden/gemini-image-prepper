@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A single-file React web app for preparing images for Gemini's outpainting feature. Designed primarily for Magic: The Gathering card scans from Scryfall. The entire application lives in `gemini-outpaint-prepper.html` (~1827 lines).
+A single-file React web app for preparing images for Gemini's outpainting feature. Designed primarily for Magic: The Gathering card scans from Scryfall. The entire application lives in `gemini-outpaint-prepper.html` (~2350 lines). Hash-based routing (`#/` and `#/merger`) switches between the Prepper and Merger pages.
 
 ## Repository Structure
 
@@ -38,13 +38,16 @@ For local dev, just open `gemini-outpaint-prepper.html` in a browser — React a
 - React 18: `https://unpkg.com/react@18/umd/react.development.js`
 - ReactDOM 18: `https://unpkg.com/react-dom@18/umd/react-dom.development.js`
 - Babel Standalone: `https://unpkg.com/@babel/standalone/babel.min.js`
+- ag-psd: `https://unpkg.com/ag-psd@30.1.0/dist/bundle.js` (PSD export with layers)
 
 ### File Layout (top to bottom)
 
 1. **`<head>`** (lines 1–72): Meta tags, Tailwind config (custom colors, animations), custom CSS (scrollbar, mobile styles)
-2. **React component** (lines 73–1610): `DetailPreserveImageResizer` — the main and only React component
-3. **Outpaint prompt section** (lines 1618–1709): Static HTML with two pre-written Gemini prompts and copy buttons
-4. **Copy-to-clipboard utility** (lines 1711–1823): Vanilla JS IIFE handling clipboard with multiple fallbacks
+2. **`DetailPreserveImageResizer`** (lines 73–1613): Prepper component — canvas-based image positioning
+3. **`ImageMerger`** (lines ~1615–2090): Merger component — OG card blending onto outpaint with feathered edges
+4. **`App` router** (lines ~2092–2120): Hash-based routing between Prepper (`#/`) and Merger (`#/merger`)
+5. **Outpaint prompt section** (lines ~2125–2220): Static HTML with two pre-written Gemini prompts and copy buttons
+6. **Copy-to-clipboard utility** (lines ~2222–2340): Vanilla JS IIFE handling clipboard with multiple fallbacks
 
 ### Main Component: `DetailPreserveImageResizer`
 
@@ -59,6 +62,24 @@ A single React function component managing all state and canvas rendering. Key s
 - **Download/export** (`downloadPNG`, lines ~920–980): Full-size canvas render → blob download
 - **Aspect ratio prompt updater** (lines 986–1040): Auto-updates textarea line 6 with current canvas ratio
 - **JSX render** (lines 1042–1610): UI layout with controls, canvas, and info section
+
+### ImageMerger Component
+
+Merges the original high-quality card back onto Gemini's outpaint output with feathered blending.
+
+- **3 file uploads**: OG image (original card), Outpaint image (Gemini output), Guide image (prepper output for auto-alignment)
+- **Auto-alignment**: Scans guide image for non-`#808080` pixels, finds bounding box, maps position to outpaint canvas
+- **Feathered edge mask**: Uses `ctx.filter = blur()` + `destination-in` compositing for seamless blending
+- **Layer toggles**: Outpaint / OG Image / Mask Preview / Guide — for A/B comparison
+- **5 export options**: Merged PNG, OG on transparent, B/W feather mask, Outpaint background, Layered PSD (via ag-psd)
+- **Drag + arrow keys**: Manual fine-tuning of OG position
+
+### App Router
+
+Hash-based routing via `window.location.hash`:
+- `#/` or empty → `DetailPreserveImageResizer` (Prepper)
+- `#/merger` → `ImageMerger` (Merger)
+- Nav bar at top with two links; prompts section hidden on Merger page
 
 ### Canvas Rendering Pipeline (three-canvas approach)
 
@@ -110,6 +131,8 @@ Custom animation: `fade-in` (0.3s ease-in-out translateY)
 
 ## Key State Variables
 
+### DetailPreserveImageResizer (Prepper)
+
 | Variable | Type | Default | Description |
 |---|---|---|---|
 | `canvasW` / `canvasH` | number | 3520 / 4800 | Canvas output dimensions (user-adjustable) |
@@ -120,6 +143,17 @@ Custom animation: `fade-in` (0.3s ease-in-out translateY)
 | `resizeAlgorithm` | string | `"detail-preserve"` | `"detail-preserve"` or `"standard"` |
 | `dpiOverride` | string | `""` | DPI value for auto-scaling (empty = disabled) |
 | `overlays` | array | `[]` | Loaded overlay objects with enabled/opacity state |
+
+### ImageMerger
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `ogImage` / `outpaintImage` / `guideImage` | Image \| null | null | Three uploaded images |
+| `canvasW` / `canvasH` | number | 3520 / 4800 | Canvas matches outpaint dimensions |
+| `canvasScale` | number | 0.25 | Responsive preview scaling |
+| `ogState` | `{x, y, w, h}` | auto-detected | OG position (w/h = natural size) |
+| `featherStrength` | number | 40 | Feather edge width in pixels |
+| `layers` | `{og, outpaint, guide, mask}` | og+outpaint on | Layer visibility toggles |
 
 ## Important Notes
 
