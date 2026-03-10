@@ -110,7 +110,6 @@
         const [canvasW, setCanvasW] = useState(3520);
         const [canvasH, setCanvasH] = useState(4800);
         const [canvasScale, setCanvasScale] = useState(0.25);
-        const [canvasMaxHeight, setCanvasMaxHeight] = useState("70vh");
 
         const [imageObj, setImageObj] = useState(null);
 
@@ -617,16 +616,6 @@
 
             setCanvasScale(scale);
 
-            // Calculate max height based on scaled canvas height
-            const scaledHeight = canvasH * scale;
-            const viewportHeight = window.innerHeight;
-
-            // Use 80% of viewport height, or scaled canvas height + 100px padding, whichever is smaller
-            const maxHeightVh = Math.min(
-              80,
-              ((scaledHeight + 100) / viewportHeight) * 100,
-            );
-            setCanvasMaxHeight(`${Math.max(50, Math.min(maxHeightVh, 80))}vh`);
           };
 
           calculateScale();
@@ -1436,9 +1425,10 @@
             </div>
 
             <div
-              className={`border border-[#333] w-full overflow-auto -mx-4 sm:mx-0 px-2 sm:px-0 transition-all ${activeInteraction ? "border-blue-500" : ""}`}
+              className={`border border-[#333] overflow-hidden -mx-4 sm:mx-0 px-2 sm:px-0 transition-all ${activeInteraction ? "border-blue-500" : ""}`}
               style={{
-                maxHeight: canvasMaxHeight,
+                width: canvasW * canvasScale,
+                height: canvasH * canvasScale,
                 touchAction: imageObj ? "none" : "auto",
               }}
             >
