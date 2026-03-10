@@ -1623,9 +1623,8 @@
         };
       }
 
-      // Shared mask canvas generator — returns a canvas with white mask shape on transparent bg.
-      // Used by applyFeatheredMask, drawPreview mask, downloadMask, and PSD export.
-      function generateMaskCanvas(w, h, feather, radius, irregularity, seed) {
+      // Mask A: Clean feathered rounded rectangle — defines maximum visible area.
+      function generateFeatherMask(w, h, feather, radius) {
         const canvas = document.createElement("canvas");
         canvas.width = w;
         canvas.height = h;
@@ -1633,7 +1632,6 @@
         const inset = feather;
 
         if (inset * 2 >= w || inset * 2 >= h) {
-          // Feather too large, fill entire rect
           ctx.fillStyle = "white";
           ctx.fillRect(0, 0, w, h);
           return canvas;
@@ -1648,107 +1646,7 @@
         ctx.filter = feather > 0 ? `blur(${feather / 2}px)` : "none";
         ctx.fillStyle = "white";
 
-        if (irregularity > 0) {
-          // Generate wobbly path using seeded noise
-          const rng = mulberry32(seed);
-          const step = 8; // sample every ~8px along perimeter
-          const maxDisp = irregularity * 1.5; // max displacement in px
-
-          // Generate smooth noise: sample at intervals, then interpolate
-          const perim = 2 * (iw + ih);
-          const nSamples = Math.max(16, Math.ceil(perim / step));
-          // Pre-generate noise values for smooth interpolation
-          const noiseVals = [];
-          for (let i = 0; i < nSamples; i++) noiseVals.push((rng() - 0.5) * 2 * maxDisp);
-          // Smooth the noise by averaging neighbors (2 passes)
-          for (let pass = 0; pass < 2; pass++) {
-            const smoothed = [];
-            for (let i = 0; i < nSamples; i++) {
-              const prev = noiseVals[(i - 1 + nSamples) % nSamples];
-              const curr = noiseVals[i];
-              const next = noiseVals[(i + 1) % nSamples];
-              smoothed.push((prev + curr * 2 + next) / 4);
-            }
-            for (let i = 0; i < nSamples; i++) noiseVals[i] = smoothed[i];
-          }
-
-          // Walk the perimeter of the (rounded) rectangle and displace points
-          const points = [];
-          const cx = ix + iw / 2;
-          const cy = iy + ih / 2;
-
-          for (let i = 0; i < nSamples; i++) {
-            const t = i / nSamples;
-            const d = t * perim;
-            let px, py, nx, ny; // point + normal
-
-            if (d < iw - 2 * r) {
-              // Top edge (left to right, after top-left corner)
-              px = ix + r + d; py = iy;
-              nx = 0; ny = -1;
-            } else if (d < iw - 2 * r + Math.PI * r / 2) {
-              // Top-right corner arc
-              const arcD = d - (iw - 2 * r);
-              const angle = -Math.PI / 2 + arcD / r;
-              px = ix + iw - r + Math.cos(angle) * r;
-              py = iy + r + Math.sin(angle) * r;
-              nx = Math.cos(angle); ny = Math.sin(angle);
-            } else if (d < iw - 2 * r + Math.PI * r / 2 + ih - 2 * r) {
-              // Right edge (top to bottom)
-              const edgeD = d - (iw - 2 * r + Math.PI * r / 2);
-              px = ix + iw; py = iy + r + edgeD;
-              nx = 1; ny = 0;
-            } else if (d < iw - 2 * r + Math.PI * r + ih - 2 * r) {
-              // Bottom-right corner arc
-              const arcD = d - (iw - 2 * r + Math.PI * r / 2 + ih - 2 * r);
-              const angle = 0 + arcD / r;
-              px = ix + iw - r + Math.cos(angle) * r;
-              py = iy + ih - r + Math.sin(angle) * r;
-              nx = Math.cos(angle); ny = Math.sin(angle);
-            } else if (d < 2 * (iw - 2 * r) + Math.PI * r + ih - 2 * r) {
-              // Bottom edge (right to left)
-              const edgeD = d - (iw - 2 * r + Math.PI * r + ih - 2 * r);
-              px = ix + iw - r - edgeD; py = iy + ih;
-              nx = 0; ny = 1;
-            } else if (d < 2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r) {
-              // Bottom-left corner arc
-              const arcD = d - (2 * (iw - 2 * r) + Math.PI * r + ih - 2 * r);
-              const angle = Math.PI / 2 + arcD / r;
-              px = ix + r + Math.cos(angle) * r;
-              py = iy + ih - r + Math.sin(angle) * r;
-              nx = Math.cos(angle); ny = Math.sin(angle);
-            } else if (d < 2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r)) {
-              // Left edge (bottom to top)
-              const edgeD = d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r);
-              px = ix; py = iy + ih - r - edgeD;
-              nx = -1; ny = 0;
-            } else {
-              // Top-left corner arc
-              const arcD = d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r));
-              const angle = Math.PI + arcD / r;
-              px = ix + r + Math.cos(angle) * r;
-              py = iy + r + Math.sin(angle) * r;
-              nx = Math.cos(angle); ny = Math.sin(angle);
-            }
-
-            points.push({ x: px + nx * noiseVals[i], y: py + ny * noiseVals[i] });
-          }
-
-          // Draw filled path
-          ctx.beginPath();
-          ctx.moveTo(points[0].x, points[0].y);
-          for (let i = 1; i < points.length; i++) {
-            const prev = points[(i - 1 + points.length) % points.length];
-            const curr = points[i];
-            const next = points[(i + 1) % points.length];
-            // Smooth curve through points
-            const cpx = curr.x;
-            const cpy = curr.y;
-            ctx.lineTo(cpx, cpy);
-          }
-          ctx.closePath();
-          ctx.fill();
-        } else if (r > 0) {
+        if (r > 0) {
           ctx.beginPath();
           ctx.roundRect(ix, iy, iw, ih, r);
           ctx.fill();
@@ -1758,6 +1656,128 @@
 
         ctx.filter = "none";
         return canvas;
+      }
+
+      // Mask B: Wobbly-edged shape for irregular erosion — no blur, no feather inset.
+      function generateIrregularMask(w, h, radius, irregularity, seed) {
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+
+        const iw = w;
+        const ih = h;
+        const ix = 0;
+        const iy = 0;
+        const r = Math.min(radius, Math.min(iw, ih) / 2);
+
+        const rng = mulberry32(seed);
+        const step = 8;
+        const maxDisp = irregularity * 1.5;
+
+        const perim = 2 * (iw + ih);
+        const nSamples = Math.max(16, Math.ceil(perim / step));
+        const noiseVals = [];
+        for (let i = 0; i < nSamples; i++) noiseVals.push((rng() - 0.5) * 2 * maxDisp);
+        for (let pass = 0; pass < 2; pass++) {
+          const smoothed = [];
+          for (let i = 0; i < nSamples; i++) {
+            const prev = noiseVals[(i - 1 + nSamples) % nSamples];
+            const curr = noiseVals[i];
+            const next = noiseVals[(i + 1) % nSamples];
+            smoothed.push((prev + curr * 2 + next) / 4);
+          }
+          for (let i = 0; i < nSamples; i++) noiseVals[i] = smoothed[i];
+        }
+
+        const points = [];
+        for (let i = 0; i < nSamples; i++) {
+          const t = i / nSamples;
+          const d = t * perim;
+          let px, py, nx, ny;
+
+          if (d < iw - 2 * r) {
+            px = ix + r + d; py = iy;
+            nx = 0; ny = -1;
+          } else if (d < iw - 2 * r + Math.PI * r / 2) {
+            const arcD = d - (iw - 2 * r);
+            const angle = -Math.PI / 2 + arcD / r;
+            px = ix + iw - r + Math.cos(angle) * r;
+            py = iy + r + Math.sin(angle) * r;
+            nx = Math.cos(angle); ny = Math.sin(angle);
+          } else if (d < iw - 2 * r + Math.PI * r / 2 + ih - 2 * r) {
+            const edgeD = d - (iw - 2 * r + Math.PI * r / 2);
+            px = ix + iw; py = iy + r + edgeD;
+            nx = 1; ny = 0;
+          } else if (d < iw - 2 * r + Math.PI * r + ih - 2 * r) {
+            const arcD = d - (iw - 2 * r + Math.PI * r / 2 + ih - 2 * r);
+            const angle = 0 + arcD / r;
+            px = ix + iw - r + Math.cos(angle) * r;
+            py = iy + ih - r + Math.sin(angle) * r;
+            nx = Math.cos(angle); ny = Math.sin(angle);
+          } else if (d < 2 * (iw - 2 * r) + Math.PI * r + ih - 2 * r) {
+            const edgeD = d - (iw - 2 * r + Math.PI * r + ih - 2 * r);
+            px = ix + iw - r - edgeD; py = iy + ih;
+            nx = 0; ny = 1;
+          } else if (d < 2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r) {
+            const arcD = d - (2 * (iw - 2 * r) + Math.PI * r + ih - 2 * r);
+            const angle = Math.PI / 2 + arcD / r;
+            px = ix + r + Math.cos(angle) * r;
+            py = iy + ih - r + Math.sin(angle) * r;
+            nx = Math.cos(angle); ny = Math.sin(angle);
+          } else if (d < 2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r)) {
+            const edgeD = d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r);
+            px = ix; py = iy + ih - r - edgeD;
+            nx = -1; ny = 0;
+          } else {
+            const arcD = d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r));
+            const angle = Math.PI + arcD / r;
+            px = ix + r + Math.cos(angle) * r;
+            py = iy + r + Math.sin(angle) * r;
+            nx = Math.cos(angle); ny = Math.sin(angle);
+          }
+
+          points.push({ x: px + nx * noiseVals[i], y: py + ny * noiseVals[i] });
+        }
+
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        return canvas;
+      }
+
+      // Combined mask: intersect feather mask (A) with density-adjusted irregular mask (B).
+      function generateCombinedMask(w, h, feather, radius, irregularity, irregRadius, irregDensity, seed) {
+        const maskA = generateFeatherMask(w, h, feather, radius);
+
+        if (irregularity <= 0 || irregDensity <= 0) return maskA;
+
+        const maskB = generateIrregularMask(w, h, irregRadius, irregularity, seed);
+
+        // Apply density: partially fill eroded areas back in (density < 100 weakens the erosion)
+        if (irregDensity < 100) {
+          const bctx = maskB.getContext("2d");
+          bctx.globalCompositeOperation = "source-over";
+          bctx.globalAlpha = 1 - irregDensity / 100;
+          bctx.fillStyle = "white";
+          bctx.fillRect(0, 0, w, h);
+          bctx.globalAlpha = 1.0;
+          bctx.globalCompositeOperation = "source-over";
+        }
+
+        // Intersect: final = A ∩ B (visible only where both masks allow)
+        const actx = maskA.getContext("2d");
+        actx.globalCompositeOperation = "destination-in";
+        actx.drawImage(maskB, 0, 0);
+        actx.globalCompositeOperation = "source-over";
+
+        return maskA;
       }
 
       function ImageMerger() {
@@ -1774,6 +1794,8 @@
         const [maskRadius, setMaskRadius] = useState(0);
         const [irregularity, setIrregularity] = useState(0);
         const [irregSeed, setIrregSeed] = useState(() => Math.floor(Math.random() * 2147483647));
+        const [irregDensity, setIrregDensity] = useState(100);
+        const [irregRadius, setIrregRadius] = useState(0);
         const [layers, setLayers] = useState({
           og: true,
           outpaint: true,
@@ -1910,25 +1932,21 @@
         }, [ogScale, ogImage]);
 
         // Feathered mask compositing — fixed: transparent base so alpha fades properly
-        const applyFeatheredMask = useCallback((ctx, ogImg, x, y, w, h, feather, radius, irreg, seed) => {
+        const applyFeatheredMask = useCallback((ctx, ogImg, x, y, w, h, feather, radius, irreg, seed, irregRad, irregDens) => {
           const temp = document.createElement("canvas");
           temp.width = w;
           temp.height = h;
           const tctx = temp.getContext("2d");
 
-          // Draw OG image
           tctx.drawImage(ogImg, 0, 0, ogImg.naturalWidth, ogImg.naturalHeight, 0, 0, w, h);
 
           if (feather <= 0 && radius <= 0 && irreg <= 0) {
-            // No feathering/shaping, draw directly
             ctx.drawImage(temp, x, y);
             return;
           }
 
-          // Generate mask using shared helper
-          const mask = generateMaskCanvas(w, h, feather, radius, irreg, seed);
+          const mask = generateCombinedMask(w, h, feather, radius, irreg, irregRad, irregDens, seed);
 
-          // Apply mask: keeps OG pixels where mask is opaque, fades where mask is transparent
           tctx.globalCompositeOperation = "destination-in";
           tctx.drawImage(mask, 0, 0);
           tctx.globalCompositeOperation = "source-over";
@@ -1952,7 +1970,7 @@
 
           // OG with feathered mask
           if (layers.og && ogImage && ogState.w > 0) {
-            applyFeatheredMask(ctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+            applyFeatheredMask(ctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
           }
 
           // Mask preview overlay (B/W visualization)
@@ -1963,7 +1981,7 @@
             const mctx = maskPreview.getContext("2d");
             mctx.fillStyle = "black";
             mctx.fillRect(0, 0, canvasW, canvasH);
-            const shapeMask = generateMaskCanvas(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+            const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed);
             mctx.drawImage(shapeMask, ogState.x, ogState.y);
             ctx.globalAlpha = 0.5;
             ctx.drawImage(maskPreview, 0, 0);
@@ -1985,7 +2003,7 @@
             ctx.strokeRect(ogState.x, ogState.y, ogState.w, ogState.h);
             ctx.setLineDash([]);
           }
-        }, [ogImage, outpaintImage, guideImage, ogState, layers, canvasW, canvasH, featherStrength, maskRadius, irregularity, irregSeed, applyFeatheredMask]);
+        }, [ogImage, outpaintImage, guideImage, ogState, layers, canvasW, canvasH, featherStrength, maskRadius, irregularity, irregSeed, irregDensity, irregRadius, applyFeatheredMask]);
 
         // Canvas size + redraw
         useEffect(() => {
@@ -1996,7 +2014,7 @@
           drawPreview();
         }, [drawPreview, canvasW, canvasH]);
 
-        useEffect(() => drawPreview(), [drawPreview, ogState, layers, featherStrength, maskRadius, irregularity, irregSeed]);
+        useEffect(() => drawPreview(), [drawPreview, ogState, layers, featherStrength, maskRadius, irregularity, irregSeed, irregDensity, irregRadius]);
 
         // Responsive scaling
         useEffect(() => {
@@ -2122,7 +2140,7 @@
           const fctx = final.getContext("2d");
           fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
           if (ogImage && ogState.w > 0) {
-            applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+            applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
           }
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
@@ -2146,7 +2164,7 @@
           final.width = canvasW;
           final.height = canvasH;
           const fctx = final.getContext("2d");
-          applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+          applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
             const url = URL.createObjectURL(blob);
@@ -2171,7 +2189,7 @@
           const fctx = final.getContext("2d");
           fctx.fillStyle = "black";
           fctx.fillRect(0, 0, canvasW, canvasH);
-          const shapeMask = generateMaskCanvas(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+          const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed);
           fctx.drawImage(shapeMask, ogState.x, ogState.y);
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
@@ -2264,7 +2282,7 @@
                 const pmctx = psdMaskCanvas.getContext("2d");
                 pmctx.fillStyle = "black";
                 pmctx.fillRect(0, 0, canvasW, canvasH);
-                const shapeMask = generateMaskCanvas(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+                const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed);
                 pmctx.drawImage(shapeMask, ogState.x, ogState.y);
 
                 children.push({
@@ -2290,7 +2308,7 @@
               const mergedCtx = mergedCanvas.getContext("2d");
               mergedCtx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
               if (ogImage && ogState.w > 0) {
-                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
               }
 
               children.push({
@@ -2364,8 +2382,8 @@
 
             {/* Controls */}
             <div className="flex flex-col gap-3 mb-4">
-              {/* Sliders */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              {/* OG Scale */}
+              <div className="text-sm">
                 <label className="flex items-center gap-2">
                   <span className="text-slate-300 whitespace-nowrap w-36">OG Scale: {ogScale}%</span>
                   <input type="range" min="10" max="200" step="1" value={ogScale}
@@ -2373,27 +2391,63 @@
                     disabled={!ogImage}
                     className="flex-1 accent-emerald-500" />
                 </label>
-                <label className="flex items-center gap-2">
-                  <span className="text-slate-300 whitespace-nowrap w-36">Feather: {featherStrength}px</span>
-                  <input type="range" min="0" max="200" step="1" value={featherStrength}
-                    onChange={(e) => setFeatherStrength(Number(e.target.value))}
-                    disabled={!ogImage}
-                    className="flex-1 accent-emerald-500" />
-                </label>
-                <label className="flex items-center gap-2">
-                  <span className="text-slate-300 whitespace-nowrap w-36">Radius: {maskRadius}px</span>
-                  <input type="range" min="0" max="500" step="1" value={maskRadius}
-                    onChange={(e) => setMaskRadius(Number(e.target.value))}
-                    disabled={!ogImage}
-                    className="flex-1 accent-emerald-500" />
-                </label>
-                <label className="flex items-center gap-2">
-                  <span className="text-slate-300 whitespace-nowrap w-36">Irregularity: {irregularity}</span>
-                  <input type="range" min="0" max="100" step="1" value={irregularity}
-                    onChange={(e) => setIrregularity(Number(e.target.value))}
-                    disabled={!ogImage}
-                    className="flex-1 accent-emerald-500" />
-                </label>
+              </div>
+
+              {/* Feather group */}
+              <div className="text-sm">
+                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Feather</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                  <label className="flex items-center gap-2">
+                    <span className="text-slate-300 whitespace-nowrap w-36">Feather: {featherStrength}px</span>
+                    <input type="range" min="0" max="200" step="1" value={featherStrength}
+                      onChange={(e) => setFeatherStrength(Number(e.target.value))}
+                      disabled={!ogImage}
+                      className="flex-1 accent-emerald-500" />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <span className="text-slate-300 whitespace-nowrap w-36">Radius: {maskRadius}px</span>
+                    <input type="range" min="0" max="500" step="1" value={maskRadius}
+                      onChange={(e) => setMaskRadius(Number(e.target.value))}
+                      disabled={!ogImage}
+                      className="flex-1 accent-emerald-500" />
+                  </label>
+                </div>
+              </div>
+
+              {/* Irregular Edge group */}
+              <div className="text-sm">
+                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Irregular Edge</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                  <label className="flex items-center gap-2">
+                    <span className="text-slate-300 whitespace-nowrap w-36">Magnitude: {irregularity}</span>
+                    <input type="range" min="0" max="100" step="1" value={irregularity}
+                      onChange={(e) => setIrregularity(Number(e.target.value))}
+                      disabled={!ogImage}
+                      className="flex-1 accent-emerald-500" />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <span className="text-slate-300 whitespace-nowrap w-36">Density: {irregDensity}%</span>
+                    <input type="range" min="0" max="100" step="1" value={irregDensity}
+                      onChange={(e) => setIrregDensity(Number(e.target.value))}
+                      disabled={!ogImage}
+                      className="flex-1 accent-emerald-500" />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <span className="text-slate-300 whitespace-nowrap w-36">Irreg Radius: {irregRadius}px</span>
+                    <input type="range" min="0" max="500" step="1" value={irregRadius}
+                      onChange={(e) => setIrregRadius(Number(e.target.value))}
+                      disabled={!ogImage}
+                      className="flex-1 accent-emerald-500" />
+                  </label>
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => setIrregSeed(Math.floor(Math.random() * 2147483647))}
+                      disabled={!ogImage || irregularity <= 0}
+                      className="px-3 py-1 rounded bg-slate-700 text-white text-sm hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed min-h-[32px]">
+                      Reseed
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Layer toggles */}
