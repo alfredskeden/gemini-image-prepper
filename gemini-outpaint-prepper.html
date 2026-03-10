@@ -132,6 +132,7 @@
           useState("detail-preserve");
         const [isProcessing, setIsProcessing] = useState(false);
         const [activeInteraction, setActiveInteraction] = useState(false);
+        const [continueToMerger, setContinueToMerger] = useState(false);
 
         // ---- DPI override state + effect ----
         const [dpiOverride, setDpiOverride] = useState(""); // empty = disabled
@@ -979,7 +980,23 @@
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
-            setIsProcessing(false);
+
+            if (continueToMerger && imageObj) {
+              const guideUrl = URL.createObjectURL(blob);
+              const guideImg = new Image();
+              guideImg.onload = () => {
+                window.__prepperHandoff = {
+                  ogImage: imageObj,
+                  guideImage: guideImg,
+                  guideUrl: guideUrl,
+                };
+                window.location.hash = "#/merger";
+                setIsProcessing(false);
+              };
+              guideImg.src = guideUrl;
+            } else {
+              setIsProcessing(false);
+            }
           }, "image/png");
         };
 
@@ -1218,6 +1235,17 @@
                   "Download PNG"
                 )}
               </button>
+              {imageObj && (
+                <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer min-h-[44px] sm:min-h-0 select-none">
+                  <input
+                    type="checkbox"
+                    checked={continueToMerger}
+                    onChange={(e) => setContinueToMerger(e.target.checked)}
+                    className="accent-green-600 w-4 h-4"
+                  />
+                  Continue to Merger after download
+                </label>
+              )}
             </div>
 
             <div className="mb-4">
@@ -1858,6 +1886,27 @@
         const [isProcessing, setIsProcessing] = useState(false);
         const [alignmentStatus, setAlignmentStatus] = useState("");
 
+        // Consume handoff from Prepper (one-shot)
+        useEffect(() => {
+          const handoff = window.__prepperHandoff;
+          if (!handoff) return;
+          window.__prepperHandoff = null;
+
+          const { ogImage: og, guideImage: guide, guideUrl } = handoff;
+
+          setOgImage(og);
+          setCanvasW(og.naturalWidth);
+          setCanvasH(og.naturalHeight);
+          setOgState({ x: 0, y: 0, w: og.naturalWidth, h: og.naturalHeight });
+          setOgScale(100);
+          setIrregSeed(Math.floor(Math.random() * 2147483647));
+
+          setGuideImage(guide);
+          analyzeGuideAndExpand(guide, og);
+
+          if (guideUrl) URL.revokeObjectURL(guideUrl);
+        }, []);
+
         // Step 1: Upload OG image — canvas = OG natural size, OG at (0,0)
         const onOgFile = (e) => {
           const file = e.target.files[0];
@@ -1892,8 +1941,9 @@
           img.src = URL.createObjectURL(file);
         };
 
-        const analyzeGuideAndExpand = (guide) => {
-          if (!ogImage) {
+        const analyzeGuideAndExpand = (guide, ogImg) => {
+          if (!ogImg) ogImg = ogImage;
+          if (!ogImg) {
             setAlignmentStatus("Upload OG image first.");
             return;
           }
@@ -1951,8 +2001,8 @@
 
           // The OG occupies bboxW/guideW of the guide horizontally, same vertically.
           // We keep OG at its natural pixel size and scale the canvas up proportionally.
-          const ogW = ogImage.naturalWidth;
-          const ogH = ogImage.naturalHeight;
+          const ogW = ogImg.naturalWidth;
+          const ogH = ogImg.naturalHeight;
 
           // Canvas = OG size scaled by the inverse of the bbox ratio
           const newCanvasW = Math.round(ogW * (guide.naturalWidth / bboxW));
