@@ -2238,22 +2238,8 @@
             try {
               const children = [];
 
-              // Layer 1 (bottom): Outpaint Background
-              const outpaintCanvas = document.createElement("canvas");
-              outpaintCanvas.width = canvasW;
-              outpaintCanvas.height = canvasH;
-              const octx = outpaintCanvas.getContext("2d");
-              octx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
-
-              children.push({
-                name: "Outpaint Background",
-                canvas: outpaintCanvas,
-                left: 0,
-                top: 0,
-              });
-
+              // Layer 4 (bottom): Unfeathered OG
               if (ogImage && ogState.w > 0) {
-                // Layer 2: OG Unfeathered (raw card, no mask, hidden)
                 const ogRawCanvas = document.createElement("canvas");
                 ogRawCanvas.width = canvasW;
                 ogRawCanvas.height = canvasH;
@@ -2267,8 +2253,41 @@
                   top: 0,
                   hidden: true,
                 });
+              }
 
-                // Layer 3: OG Card with feather mask as PSD layer mask
+              // Layer 3: Merged
+              const mergedCanvas = document.createElement("canvas");
+              mergedCanvas.width = canvasW;
+              mergedCanvas.height = canvasH;
+              const mergedCtx = mergedCanvas.getContext("2d");
+              mergedCtx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
+              if (ogImage && ogState.w > 0) {
+                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
+              }
+
+              children.push({
+                name: "Merged",
+                canvas: mergedCanvas,
+                left: 0,
+                top: 0,
+              });
+
+              // Layer 2: Scaled Outpaint
+              const outpaintCanvas = document.createElement("canvas");
+              outpaintCanvas.width = canvasW;
+              outpaintCanvas.height = canvasH;
+              const octx = outpaintCanvas.getContext("2d");
+              octx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
+
+              children.push({
+                name: "Scaled Outpaint",
+                canvas: outpaintCanvas,
+                left: 0,
+                top: 0,
+              });
+
+              // Layer 1 (top): OG Card with feather mask
+              if (ogImage && ogState.w > 0) {
                 const ogCanvas = document.createElement("canvas");
                 ogCanvas.width = canvasW;
                 ogCanvas.height = canvasH;
@@ -2300,23 +2319,6 @@
                   },
                 });
               }
-
-              // Layer 4 (top): Merged
-              const mergedCanvas = document.createElement("canvas");
-              mergedCanvas.width = canvasW;
-              mergedCanvas.height = canvasH;
-              const mergedCtx = mergedCanvas.getContext("2d");
-              mergedCtx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
-              if (ogImage && ogState.w > 0) {
-                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
-              }
-
-              children.push({
-                name: "Merged",
-                canvas: mergedCanvas,
-                left: 0,
-                top: 0,
-              });
 
               const psd = {
                 width: canvasW,
