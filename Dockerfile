@@ -3,9 +3,6 @@ FROM nginx:alpine
 # Copy the HTML file to nginx html directory
 COPY "gemini-outpaint-prepper.html" /usr/share/nginx/html/index.html
 
-# Copy the overlay image
-COPY "overlay.png" /usr/share/nginx/html/overlay.png
-
 # Expose port 6622
 EXPOSE 6622
 
