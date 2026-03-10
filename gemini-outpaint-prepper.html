@@ -616,7 +616,6 @@
             }
 
             setCanvasScale(scale);
-
           };
 
           calculateScale();
@@ -1615,11 +1614,12 @@
 
       // Seeded PRNG (mulberry32) for deterministic noise
       function mulberry32(seed) {
-        return function() {
-          seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-          let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-          t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-          return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        return function () {
+          seed |= 0;
+          seed = (seed + 0x6d2b79f5) | 0;
+          let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
       }
 
@@ -1678,7 +1678,8 @@
         const perim = 2 * (iw + ih);
         const nSamples = Math.max(16, Math.ceil(perim / step));
         const noiseVals = [];
-        for (let i = 0; i < nSamples; i++) noiseVals.push((rng() - 0.5) * 2 * maxDisp);
+        for (let i = 0; i < nSamples; i++)
+          noiseVals.push((rng() - 0.5) * 2 * maxDisp);
         for (let pass = 0; pass < 2; pass++) {
           const smoothed = [];
           for (let i = 0; i < nSamples; i++) {
@@ -1697,44 +1698,61 @@
           let px, py, nx, ny;
 
           if (d < iw - 2 * r) {
-            px = ix + r + d; py = iy;
-            nx = 0; ny = -1;
-          } else if (d < iw - 2 * r + Math.PI * r / 2) {
+            px = ix + r + d;
+            py = iy;
+            nx = 0;
+            ny = -1;
+          } else if (d < iw - 2 * r + (Math.PI * r) / 2) {
             const arcD = d - (iw - 2 * r);
             const angle = -Math.PI / 2 + arcD / r;
             px = ix + iw - r + Math.cos(angle) * r;
             py = iy + r + Math.sin(angle) * r;
-            nx = Math.cos(angle); ny = Math.sin(angle);
-          } else if (d < iw - 2 * r + Math.PI * r / 2 + ih - 2 * r) {
-            const edgeD = d - (iw - 2 * r + Math.PI * r / 2);
-            px = ix + iw; py = iy + r + edgeD;
-            nx = 1; ny = 0;
+            nx = Math.cos(angle);
+            ny = Math.sin(angle);
+          } else if (d < iw - 2 * r + (Math.PI * r) / 2 + ih - 2 * r) {
+            const edgeD = d - (iw - 2 * r + (Math.PI * r) / 2);
+            px = ix + iw;
+            py = iy + r + edgeD;
+            nx = 1;
+            ny = 0;
           } else if (d < iw - 2 * r + Math.PI * r + ih - 2 * r) {
-            const arcD = d - (iw - 2 * r + Math.PI * r / 2 + ih - 2 * r);
+            const arcD = d - (iw - 2 * r + (Math.PI * r) / 2 + ih - 2 * r);
             const angle = 0 + arcD / r;
             px = ix + iw - r + Math.cos(angle) * r;
             py = iy + ih - r + Math.sin(angle) * r;
-            nx = Math.cos(angle); ny = Math.sin(angle);
+            nx = Math.cos(angle);
+            ny = Math.sin(angle);
           } else if (d < 2 * (iw - 2 * r) + Math.PI * r + ih - 2 * r) {
             const edgeD = d - (iw - 2 * r + Math.PI * r + ih - 2 * r);
-            px = ix + iw - r - edgeD; py = iy + ih;
-            nx = 0; ny = 1;
+            px = ix + iw - r - edgeD;
+            py = iy + ih;
+            nx = 0;
+            ny = 1;
           } else if (d < 2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r) {
             const arcD = d - (2 * (iw - 2 * r) + Math.PI * r + ih - 2 * r);
             const angle = Math.PI / 2 + arcD / r;
             px = ix + r + Math.cos(angle) * r;
             py = iy + ih - r + Math.sin(angle) * r;
-            nx = Math.cos(angle); ny = Math.sin(angle);
-          } else if (d < 2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r)) {
-            const edgeD = d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r);
-            px = ix; py = iy + ih - r - edgeD;
-            nx = -1; ny = 0;
+            nx = Math.cos(angle);
+            ny = Math.sin(angle);
+          } else if (
+            d <
+            2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r)
+          ) {
+            const edgeD =
+              d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r);
+            px = ix;
+            py = iy + ih - r - edgeD;
+            nx = -1;
+            ny = 0;
           } else {
-            const arcD = d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r));
+            const arcD =
+              d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r));
             const angle = Math.PI + arcD / r;
             px = ix + r + Math.cos(angle) * r;
             py = iy + r + Math.sin(angle) * r;
-            nx = Math.cos(angle); ny = Math.sin(angle);
+            nx = Math.cos(angle);
+            ny = Math.sin(angle);
           }
 
           points.push({ x: px + nx * noiseVals[i], y: py + ny * noiseVals[i] });
@@ -1753,12 +1771,28 @@
       }
 
       // Combined mask: intersect feather mask (A) with density-adjusted irregular mask (B).
-      function generateCombinedMask(w, h, feather, radius, irregularity, irregRadius, irregDensity, seed, irregBlur) {
+      function generateCombinedMask(
+        w,
+        h,
+        feather,
+        radius,
+        irregularity,
+        irregRadius,
+        irregDensity,
+        seed,
+        irregBlur,
+      ) {
         const maskA = generateFeatherMask(w, h, feather, radius);
 
         if (irregularity <= 0 || irregDensity <= 0) return maskA;
 
-        const maskB = generateIrregularMask(w, h, irregRadius, irregularity, seed);
+        const maskB = generateIrregularMask(
+          w,
+          h,
+          irregRadius,
+          irregularity,
+          seed,
+        );
 
         // Apply gaussian blur to irregular mask edges
         if (irregBlur > 0) {
@@ -1802,14 +1836,16 @@
         const [canvasH, setCanvasH] = useState(600);
         const [canvasScale, setCanvasScale] = useState(0.25);
         const [ogState, setOgState] = useState({ x: 0, y: 0, w: 0, h: 0 });
-        const [featherStrength, setFeatherStrength] = useState(40);
+        const [featherStrength, setFeatherStrength] = useState(70);
         const [ogScale, setOgScale] = useState(100);
-        const [maskRadius, setMaskRadius] = useState(0);
-        const [irregularity, setIrregularity] = useState(0);
-        const [irregSeed, setIrregSeed] = useState(() => Math.floor(Math.random() * 2147483647));
+        const [maskRadius, setMaskRadius] = useState(160);
+        const [irregularity, setIrregularity] = useState(100);
+        const [irregSeed, setIrregSeed] = useState(() =>
+          Math.floor(Math.random() * 2147483647),
+        );
         const [irregDensity, setIrregDensity] = useState(100);
         const [irregRadius, setIrregRadius] = useState(0);
-        const [irregBlur, setIrregBlur] = useState(0);
+        const [irregBlur, setIrregBlur] = useState(12);
         const [layers, setLayers] = useState({
           og: true,
           outpaint: true,
@@ -1836,7 +1872,9 @@
             setOgState({ x: 0, y: 0, w, h });
             setOgScale(100);
             setIrregSeed(Math.floor(Math.random() * 2147483647));
-            setAlignmentStatus(`OG loaded: ${w}x${h}px. Now upload the prepper output (gray-bordered guide).`);
+            setAlignmentStatus(
+              `OG loaded: ${w}x${h}px. Now upload the prepper output (gray-bordered guide).`,
+            );
           };
           img.src = URL.createObjectURL(file);
         };
@@ -1866,17 +1904,31 @@
           tempCanvas.height = guide.naturalHeight;
           const ctx = tempCanvas.getContext("2d");
           ctx.drawImage(guide, 0, 0);
-          const data = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
+          const data = ctx.getImageData(
+            0,
+            0,
+            tempCanvas.width,
+            tempCanvas.height,
+          ).data;
 
           const threshold = 12;
-          let minX = tempCanvas.width, minY = tempCanvas.height, maxX = 0, maxY = 0;
+          let minX = tempCanvas.width,
+            minY = tempCanvas.height,
+            maxX = 0,
+            maxY = 0;
           let found = false;
 
           for (let y = 0; y < tempCanvas.height; y++) {
             for (let x = 0; x < tempCanvas.width; x++) {
               const i = (y * tempCanvas.width + x) * 4;
-              const r = data[i], g = data[i + 1], b = data[i + 2];
-              if (Math.abs(r - 128) > threshold || Math.abs(g - 128) > threshold || Math.abs(b - 128) > threshold) {
+              const r = data[i],
+                g = data[i + 1],
+                b = data[i + 2];
+              if (
+                Math.abs(r - 128) > threshold ||
+                Math.abs(g - 128) > threshold ||
+                Math.abs(b - 128) > threshold
+              ) {
                 if (x < minX) minX = x;
                 if (x > maxX) maxX = x;
                 if (y < minY) minY = y;
@@ -1887,7 +1939,9 @@
           }
 
           if (!found) {
-            setAlignmentStatus("Could not detect non-gray region in guide image.");
+            setAlignmentStatus(
+              "Could not detect non-gray region in guide image.",
+            );
             return;
           }
 
@@ -1913,7 +1967,7 @@
           setOgState({ x: newX, y: newY, w: ogW, h: ogH });
           setOgScale(100);
           setAlignmentStatus(
-            `Canvas expanded to ${newCanvasW}x${newCanvasH}. OG placed at (${newX}, ${newY}). Now upload the Gemini outpaint.`
+            `Canvas expanded to ${newCanvasW}x${newCanvasH}. OG placed at (${newX}, ${newY}). Now upload the Gemini outpaint.`,
           );
         };
 
@@ -1924,7 +1978,9 @@
           const img = new Image();
           img.onload = () => {
             setOutpaintImage(img);
-            setAlignmentStatus("Outpaint loaded as background. Toggle layers to compare alignment.");
+            setAlignmentStatus(
+              "Outpaint loaded as background. Toggle layers to compare alignment.",
+            );
           };
           img.src = URL.createObjectURL(file);
         };
@@ -1934,8 +1990,8 @@
           if (!ogImage) return;
           const natW = ogImage.naturalWidth;
           const natH = ogImage.naturalHeight;
-          const newW = Math.round(natW * ogScale / 100);
-          const newH = Math.round(natH * ogScale / 100);
+          const newW = Math.round((natW * ogScale) / 100);
+          const newH = Math.round((natH * ogScale) / 100);
           setOgState((s) => ({
             ...s,
             w: newW,
@@ -1946,27 +2002,64 @@
         }, [ogScale, ogImage]);
 
         // Feathered mask compositing — fixed: transparent base so alpha fades properly
-        const applyFeatheredMask = useCallback((ctx, ogImg, x, y, w, h, feather, radius, irreg, seed, irregRad, irregDens, iBlur) => {
-          const temp = document.createElement("canvas");
-          temp.width = w;
-          temp.height = h;
-          const tctx = temp.getContext("2d");
+        const applyFeatheredMask = useCallback(
+          (
+            ctx,
+            ogImg,
+            x,
+            y,
+            w,
+            h,
+            feather,
+            radius,
+            irreg,
+            seed,
+            irregRad,
+            irregDens,
+            iBlur,
+          ) => {
+            const temp = document.createElement("canvas");
+            temp.width = w;
+            temp.height = h;
+            const tctx = temp.getContext("2d");
 
-          tctx.drawImage(ogImg, 0, 0, ogImg.naturalWidth, ogImg.naturalHeight, 0, 0, w, h);
+            tctx.drawImage(
+              ogImg,
+              0,
+              0,
+              ogImg.naturalWidth,
+              ogImg.naturalHeight,
+              0,
+              0,
+              w,
+              h,
+            );
 
-          if (feather <= 0 && radius <= 0 && irreg <= 0) {
+            if (feather <= 0 && radius <= 0 && irreg <= 0) {
+              ctx.drawImage(temp, x, y);
+              return;
+            }
+
+            const mask = generateCombinedMask(
+              w,
+              h,
+              feather,
+              radius,
+              irreg,
+              irregRad,
+              irregDens,
+              seed,
+              iBlur,
+            );
+
+            tctx.globalCompositeOperation = "destination-in";
+            tctx.drawImage(mask, 0, 0);
+            tctx.globalCompositeOperation = "source-over";
+
             ctx.drawImage(temp, x, y);
-            return;
-          }
-
-          const mask = generateCombinedMask(w, h, feather, radius, irreg, irregRad, irregDens, seed, iBlur);
-
-          tctx.globalCompositeOperation = "destination-in";
-          tctx.drawImage(mask, 0, 0);
-          tctx.globalCompositeOperation = "source-over";
-
-          ctx.drawImage(temp, x, y);
-        }, []);
+          },
+          [],
+        );
 
         // Draw preview
         const drawPreview = useCallback(() => {
@@ -1984,7 +2077,21 @@
 
           // OG with feathered mask
           if (layers.og && ogImage && ogState.w > 0) {
-            applyFeatheredMask(ctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity, irregBlur);
+            applyFeatheredMask(
+              ctx,
+              ogImage,
+              ogState.x,
+              ogState.y,
+              ogState.w,
+              ogState.h,
+              featherStrength,
+              maskRadius,
+              irregularity,
+              irregSeed,
+              irregRadius,
+              irregDensity,
+              irregBlur,
+            );
           }
 
           // Mask preview overlay (B/W visualization)
@@ -1995,7 +2102,17 @@
             const mctx = maskPreview.getContext("2d");
             mctx.fillStyle = "black";
             mctx.fillRect(0, 0, canvasW, canvasH);
-            const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed, irregBlur);
+            const shapeMask = generateCombinedMask(
+              ogState.w,
+              ogState.h,
+              featherStrength,
+              maskRadius,
+              irregularity,
+              irregRadius,
+              irregDensity,
+              irregSeed,
+              irregBlur,
+            );
             mctx.drawImage(shapeMask, ogState.x, ogState.y);
             ctx.globalAlpha = 0.5;
             ctx.drawImage(maskPreview, 0, 0);
@@ -2017,7 +2134,23 @@
             ctx.strokeRect(ogState.x, ogState.y, ogState.w, ogState.h);
             ctx.setLineDash([]);
           }
-        }, [ogImage, outpaintImage, guideImage, ogState, layers, canvasW, canvasH, featherStrength, maskRadius, irregularity, irregSeed, irregDensity, irregRadius, irregBlur, applyFeatheredMask]);
+        }, [
+          ogImage,
+          outpaintImage,
+          guideImage,
+          ogState,
+          layers,
+          canvasW,
+          canvasH,
+          featherStrength,
+          maskRadius,
+          irregularity,
+          irregSeed,
+          irregDensity,
+          irregRadius,
+          irregBlur,
+          applyFeatheredMask,
+        ]);
 
         // Canvas size + redraw
         useEffect(() => {
@@ -2028,7 +2161,21 @@
           drawPreview();
         }, [drawPreview, canvasW, canvasH]);
 
-        useEffect(() => drawPreview(), [drawPreview, ogState, layers, featherStrength, maskRadius, irregularity, irregSeed, irregDensity, irregRadius, irregBlur]);
+        useEffect(
+          () => drawPreview(),
+          [
+            drawPreview,
+            ogState,
+            layers,
+            featherStrength,
+            maskRadius,
+            irregularity,
+            irregSeed,
+            irregDensity,
+            irregRadius,
+            irregBlur,
+          ],
+        );
 
         // Responsive scaling
         useEffect(() => {
@@ -2038,11 +2185,20 @@
             const availableWidth = windowWidth - padding;
             let scale = 0.25;
             if (availableWidth < 400) {
-              scale = Math.max(0.09, Math.min(0.13, (availableWidth * 0.95) / canvasW));
+              scale = Math.max(
+                0.09,
+                Math.min(0.13, (availableWidth * 0.95) / canvasW),
+              );
             } else if (availableWidth < 640) {
-              scale = Math.max(0.13, Math.min(0.19, (availableWidth * 0.9) / canvasW));
+              scale = Math.max(
+                0.13,
+                Math.min(0.19, (availableWidth * 0.9) / canvasW),
+              );
             } else if (availableWidth < 768) {
-              scale = Math.max(0.16, Math.min(0.22, (availableWidth * 0.85) / canvasW));
+              scale = Math.max(
+                0.16,
+                Math.min(0.22, (availableWidth * 0.85) / canvasW),
+              );
             } else if (availableWidth < 1024) {
               scale = 0.22;
             } else {
@@ -2085,7 +2241,16 @@
           if (!ogImage) return;
           if (e.type === "touchstart") e.preventDefault();
           const pos = getMousePos(e);
-          if (pointInRect(pos.x, pos.y, ogState.x, ogState.y, ogState.w, ogState.h)) {
+          if (
+            pointInRect(
+              pos.x,
+              pos.y,
+              ogState.x,
+              ogState.y,
+              ogState.w,
+              ogState.h,
+            )
+          ) {
             setDragging(true);
             setDragOffset({ dx: pos.x - ogState.x, dy: pos.y - ogState.y });
           }
@@ -2110,8 +2275,12 @@
           canvas.addEventListener("mousedown", handleMouseDown);
           window.addEventListener("mousemove", handleMouseMove);
           window.addEventListener("mouseup", handleMouseUp);
-          canvas.addEventListener("touchstart", handleMouseDown, { passive: false });
-          window.addEventListener("touchmove", handleMouseMove, { passive: false });
+          canvas.addEventListener("touchstart", handleMouseDown, {
+            passive: false,
+          });
+          window.addEventListener("touchmove", handleMouseMove, {
+            passive: false,
+          });
           window.addEventListener("touchend", handleMouseUp);
           window.addEventListener("touchcancel", handleMouseUp);
           return () => {
@@ -2129,7 +2298,11 @@
         useEffect(() => {
           const onKey = (ev) => {
             if (!ogImage) return;
-            if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) {
+            if (
+              ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
+                ev.key,
+              )
+            ) {
               ev.preventDefault();
               setOgState((s) => {
                 if (ev.key === "ArrowLeft") return { ...s, x: s.x - 1 };
@@ -2154,10 +2327,27 @@
           const fctx = final.getContext("2d");
           fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
           if (ogImage && ogState.w > 0) {
-            applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity, irregBlur);
+            applyFeatheredMask(
+              fctx,
+              ogImage,
+              ogState.x,
+              ogState.y,
+              ogState.w,
+              ogState.h,
+              featherStrength,
+              maskRadius,
+              irregularity,
+              irregSeed,
+              irregRadius,
+              irregDensity,
+              irregBlur,
+            );
           }
           final.toBlob((blob) => {
-            if (!blob) { setIsProcessing(false); return; }
+            if (!blob) {
+              setIsProcessing(false);
+              return;
+            }
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
@@ -2178,9 +2368,26 @@
           final.width = canvasW;
           final.height = canvasH;
           const fctx = final.getContext("2d");
-          applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity, irregBlur);
+          applyFeatheredMask(
+            fctx,
+            ogImage,
+            ogState.x,
+            ogState.y,
+            ogState.w,
+            ogState.h,
+            featherStrength,
+            maskRadius,
+            irregularity,
+            irregSeed,
+            irregRadius,
+            irregDensity,
+            irregBlur,
+          );
           final.toBlob((blob) => {
-            if (!blob) { setIsProcessing(false); return; }
+            if (!blob) {
+              setIsProcessing(false);
+              return;
+            }
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
@@ -2203,10 +2410,23 @@
           const fctx = final.getContext("2d");
           fctx.fillStyle = "black";
           fctx.fillRect(0, 0, canvasW, canvasH);
-          const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed, irregBlur);
+          const shapeMask = generateCombinedMask(
+            ogState.w,
+            ogState.h,
+            featherStrength,
+            maskRadius,
+            irregularity,
+            irregRadius,
+            irregDensity,
+            irregSeed,
+            irregBlur,
+          );
           fctx.drawImage(shapeMask, ogState.x, ogState.y);
           final.toBlob((blob) => {
-            if (!blob) { setIsProcessing(false); return; }
+            if (!blob) {
+              setIsProcessing(false);
+              return;
+            }
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
@@ -2229,7 +2449,10 @@
           const fctx = final.getContext("2d");
           fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
           final.toBlob((blob) => {
-            if (!blob) { setIsProcessing(false); return; }
+            if (!blob) {
+              setIsProcessing(false);
+              return;
+            }
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
@@ -2245,7 +2468,12 @@
         // Export: Layered PSD file
         const downloadPsd = () => {
           if (!outpaintImage) return;
-          if (!window.agPsd) { alert("PSD library failed to load. Check your internet connection and refresh."); return; }
+          if (!window.agPsd) {
+            alert(
+              "PSD library failed to load. Check your internet connection and refresh.",
+            );
+            return;
+          }
           setIsProcessing(true);
 
           setTimeout(() => {
@@ -2258,7 +2486,13 @@
                 ogRawCanvas.width = canvasW;
                 ogRawCanvas.height = canvasH;
                 const ogRawCtx = ogRawCanvas.getContext("2d");
-                ogRawCtx.drawImage(ogImage, ogState.x, ogState.y, ogState.w, ogState.h);
+                ogRawCtx.drawImage(
+                  ogImage,
+                  ogState.x,
+                  ogState.y,
+                  ogState.w,
+                  ogState.h,
+                );
 
                 children.push({
                   name: "OG Unfeathered",
@@ -2276,7 +2510,21 @@
               const mergedCtx = mergedCanvas.getContext("2d");
               mergedCtx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
               if (ogImage && ogState.w > 0) {
-                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity, irregBlur);
+                applyFeatheredMask(
+                  mergedCtx,
+                  ogImage,
+                  ogState.x,
+                  ogState.y,
+                  ogState.w,
+                  ogState.h,
+                  featherStrength,
+                  maskRadius,
+                  irregularity,
+                  irregSeed,
+                  irregRadius,
+                  irregDensity,
+                  irregBlur,
+                );
               }
 
               children.push({
@@ -2306,7 +2554,13 @@
                 ogCanvas.width = canvasW;
                 ogCanvas.height = canvasH;
                 const ogCtx = ogCanvas.getContext("2d");
-                ogCtx.drawImage(ogImage, ogState.x, ogState.y, ogState.w, ogState.h);
+                ogCtx.drawImage(
+                  ogImage,
+                  ogState.x,
+                  ogState.y,
+                  ogState.w,
+                  ogState.h,
+                );
 
                 // Build grayscale mask canvas (white=visible, black=hidden)
                 const psdMaskCanvas = document.createElement("canvas");
@@ -2315,7 +2569,17 @@
                 const pmctx = psdMaskCanvas.getContext("2d");
                 pmctx.fillStyle = "black";
                 pmctx.fillRect(0, 0, canvasW, canvasH);
-                const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed, irregBlur);
+                const shapeMask = generateCombinedMask(
+                  ogState.w,
+                  ogState.h,
+                  featherStrength,
+                  maskRadius,
+                  irregularity,
+                  irregRadius,
+                  irregDensity,
+                  irregSeed,
+                  irregBlur,
+                );
                 pmctx.drawImage(shapeMask, ogState.x, ogState.y);
 
                 children.push({
@@ -2341,7 +2605,9 @@
               };
 
               const buffer = agPsd.writePsd(psd);
-              const blob = new Blob([buffer], { type: "application/octet-stream" });
+              const blob = new Blob([buffer], {
+                type: "application/octet-stream",
+              });
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
@@ -2359,13 +2625,17 @@
           }, 50);
         };
 
-        const toggleLayer = (key) => setLayers((l) => ({ ...l, [key]: !l[key] }));
+        const toggleLayer = (key) =>
+          setLayers((l) => ({ ...l, [key]: !l[key] }));
 
         return (
           <div className="p-3 sm:p-4 md:p-6 max-w-full">
             <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center sm:text-left">
               Outpaint Merger
-              <span className="italic text-slate-400 ml-2" style={{ fontSize: "66%" }}>
+              <span
+                className="italic text-slate-400 ml-2"
+                style={{ fontSize: "66%" }}
+              >
                 Blend OG card back into outpaint
               </span>
             </h1>
@@ -2374,19 +2644,43 @@
             <div className="flex flex-col gap-3 mb-4">
               <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-wrap">
                 <label className="flex flex-col gap-1 text-sm sm:text-base">
-                  <span className="text-slate-300">1. OG Image (original high-quality card)</span>
-                  <input type="file" accept="image/*" onChange={onOgFile}
-                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px]" />
+                  <span className="text-slate-300">
+                    1. OG Image (original high-quality card)
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onOgFile}
+                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px]"
+                  />
                 </label>
                 <label className="flex flex-col gap-1 text-sm sm:text-base">
-                  <span className={`text-slate-300 ${!ogImage ? "opacity-40" : ""}`}>2. Prepper Output (gray-bordered guide)</span>
-                  <input type="file" accept="image/*" onChange={onGuideFile} disabled={!ogImage}
-                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px] disabled:opacity-40" />
+                  <span
+                    className={`text-slate-300 ${!ogImage ? "opacity-40" : ""}`}
+                  >
+                    2. Prepper Output (gray-bordered guide)
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onGuideFile}
+                    disabled={!ogImage}
+                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px] disabled:opacity-40"
+                  />
                 </label>
                 <label className="flex flex-col gap-1 text-sm sm:text-base">
-                  <span className={`text-slate-300 ${!guideImage ? "opacity-40" : ""}`}>3. Gemini Outpaint (expanded output)</span>
-                  <input type="file" accept="image/*" onChange={onOutpaintFile} disabled={!guideImage}
-                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px] disabled:opacity-40" />
+                  <span
+                    className={`text-slate-300 ${!guideImage ? "opacity-40" : ""}`}
+                  >
+                    3. Gemini Outpaint (expanded output)
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onOutpaintFile}
+                    disabled={!guideImage}
+                    className="text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer file:min-h-[44px] disabled:opacity-40"
+                  />
                 </label>
               </div>
               {alignmentStatus && (
@@ -2401,72 +2695,137 @@
               {/* OG Scale */}
               <div className="text-sm">
                 <label className="flex items-center gap-2">
-                  <span className="text-slate-300 whitespace-nowrap w-36">OG Scale: {ogScale}%</span>
-                  <input type="range" min="10" max="200" step="1" value={ogScale}
+                  <span className="text-slate-300 whitespace-nowrap w-36">
+                    OG Scale: {ogScale}%
+                  </span>
+                  <input
+                    type="range"
+                    min="10"
+                    max="200"
+                    step="1"
+                    value={ogScale}
                     onChange={(e) => setOgScale(Number(e.target.value))}
                     disabled={!ogImage}
-                    className="flex-1 accent-emerald-500" />
+                    className="flex-1 accent-emerald-500"
+                  />
                 </label>
               </div>
 
               {/* Feather group */}
               <div className="text-sm">
-                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Feather</div>
+                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                  Feather
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                   <label className="flex items-center gap-2">
-                    <span className="text-slate-300 whitespace-nowrap w-36">Feather: {featherStrength}px</span>
-                    <input type="range" min="0" max="200" step="1" value={featherStrength}
-                      onChange={(e) => setFeatherStrength(Number(e.target.value))}
+                    <span className="text-slate-300 whitespace-nowrap w-36">
+                      Feather: {featherStrength}px
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="200"
+                      step="1"
+                      value={featherStrength}
+                      onChange={(e) =>
+                        setFeatherStrength(Number(e.target.value))
+                      }
                       disabled={!ogImage}
-                      className="flex-1 accent-emerald-500" />
+                      className="flex-1 accent-emerald-500"
+                    />
                   </label>
                   <label className="flex items-center gap-2">
-                    <span className="text-slate-300 whitespace-nowrap w-36">Radius: {maskRadius}px</span>
-                    <input type="range" min="0" max="500" step="1" value={maskRadius}
+                    <span className="text-slate-300 whitespace-nowrap w-36">
+                      Radius: {maskRadius}px
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="500"
+                      step="1"
+                      value={maskRadius}
                       onChange={(e) => setMaskRadius(Number(e.target.value))}
                       disabled={!ogImage}
-                      className="flex-1 accent-emerald-500" />
+                      className="flex-1 accent-emerald-500"
+                    />
                   </label>
                 </div>
               </div>
 
               {/* Irregular Edge group */}
               <div className="text-sm">
-                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Irregular Edge</div>
+                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                  Irregular Edge
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                   <label className="flex items-center gap-2">
-                    <span className="text-slate-300 whitespace-nowrap w-36">Magnitude: {irregularity}</span>
-                    <input type="range" min="0" max="100" step="1" value={irregularity}
+                    <span className="text-slate-300 whitespace-nowrap w-36">
+                      Magnitude: {irregularity}
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="300"
+                      step="1"
+                      value={irregularity}
                       onChange={(e) => setIrregularity(Number(e.target.value))}
                       disabled={!ogImage}
-                      className="flex-1 accent-emerald-500" />
+                      className="flex-1 accent-emerald-500"
+                    />
                   </label>
                   <label className="flex items-center gap-2">
-                    <span className="text-slate-300 whitespace-nowrap w-36">Density: {irregDensity}%</span>
-                    <input type="range" min="0" max="100" step="1" value={irregDensity}
+                    <span className="text-slate-300 whitespace-nowrap w-36">
+                      Density: {irregDensity}%
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={irregDensity}
                       onChange={(e) => setIrregDensity(Number(e.target.value))}
                       disabled={!ogImage}
-                      className="flex-1 accent-emerald-500" />
+                      className="flex-1 accent-emerald-500"
+                    />
                   </label>
                   <label className="flex items-center gap-2">
-                    <span className="text-slate-300 whitespace-nowrap w-36">Irreg Radius: {irregRadius}px</span>
-                    <input type="range" min="0" max="500" step="1" value={irregRadius}
+                    <span className="text-slate-300 whitespace-nowrap w-36">
+                      Irreg Radius: {irregRadius}px
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="500"
+                      step="1"
+                      value={irregRadius}
                       onChange={(e) => setIrregRadius(Number(e.target.value))}
                       disabled={!ogImage}
-                      className="flex-1 accent-emerald-500" />
+                      className="flex-1 accent-emerald-500"
+                    />
                   </label>
                   <label className="flex items-center gap-2">
-                    <span className="text-slate-300 whitespace-nowrap w-36">Edge Blur: {irregBlur}px</span>
-                    <input type="range" min="0" max="100" step="1" value={irregBlur}
+                    <span className="text-slate-300 whitespace-nowrap w-36">
+                      Edge Blur: {irregBlur}px
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={irregBlur}
                       onChange={(e) => setIrregBlur(Number(e.target.value))}
                       disabled={!ogImage || irregularity <= 0}
-                      className="flex-1 accent-emerald-500" />
+                      className="flex-1 accent-emerald-500"
+                    />
                   </label>
                   <div className="flex items-center">
                     <button
-                      onClick={() => setIrregSeed(Math.floor(Math.random() * 2147483647))}
+                      onClick={() =>
+                        setIrregSeed(Math.floor(Math.random() * 2147483647))
+                      }
                       disabled={!ogImage || irregularity <= 0}
-                      className="px-3 py-1 rounded bg-slate-700 text-white text-sm hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed min-h-[32px]">
+                      className="px-3 py-1 rounded bg-slate-700 text-white text-sm hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed min-h-[32px]"
+                    >
                       Reseed
                     </button>
                   </div>
@@ -2476,23 +2835,43 @@
               {/* Layer toggles */}
               <div className="flex items-center gap-3 text-sm flex-wrap">
                 <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
-                  <input type="checkbox" checked={layers.outpaint} onChange={() => toggleLayer("outpaint")} />
+                  <input
+                    type="checkbox"
+                    checked={layers.outpaint}
+                    onChange={() => toggleLayer("outpaint")}
+                  />
                   <span>Outpaint</span>
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
-                  <input type="checkbox" checked={layers.og} onChange={() => toggleLayer("og")} />
+                  <input
+                    type="checkbox"
+                    checked={layers.og}
+                    onChange={() => toggleLayer("og")}
+                  />
                   <span>OG Image</span>
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
-                  <input type="checkbox" checked={layers.mask} onChange={() => toggleLayer("mask")} />
+                  <input
+                    type="checkbox"
+                    checked={layers.mask}
+                    onChange={() => toggleLayer("mask")}
+                  />
                   <span>Mask Preview</span>
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
-                  <input type="checkbox" checked={layers.guide} onChange={() => toggleLayer("guide")} />
+                  <input
+                    type="checkbox"
+                    checked={layers.guide}
+                    onChange={() => toggleLayer("guide")}
+                  />
                   <span>Guide</span>
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer min-h-[44px] sm:min-h-0">
-                  <input type="checkbox" checked={layers.border} onChange={() => toggleLayer("border")} />
+                  <input
+                    type="checkbox"
+                    checked={layers.border}
+                    onChange={() => toggleLayer("border")}
+                  />
                   <span>Border</span>
                 </label>
               </div>
@@ -2500,7 +2879,8 @@
               {/* Position display */}
               {ogImage && (
                 <span className="text-xs text-slate-400">
-                  OG pos: ({ogState.x}, {ogState.y}) | size: {ogState.w}x{ogState.h} | scale: {ogScale}% | canvas: {canvasW}x{canvasH}
+                  OG pos: ({ogState.x}, {ogState.y}) | size: {ogState.w}x
+                  {ogState.h} | scale: {ogScale}% | canvas: {canvasW}x{canvasH}
                 </span>
               )}
             </div>
@@ -2526,7 +2906,11 @@
                   style={{
                     background: "#808080",
                     touchAction: "none",
-                    cursor: dragging ? "grabbing" : ogImage ? "grab" : "default",
+                    cursor: dragging
+                      ? "grabbing"
+                      : ogImage
+                        ? "grab"
+                        : "default",
                   }}
                 />
               </div>
@@ -2534,39 +2918,74 @@
 
             {/* Export buttons */}
             <div className="flex flex-col sm:flex-row gap-2 mt-4 flex-wrap">
-              <button onClick={downloadMerged} disabled={!outpaintImage || isProcessing}
-                className="px-4 py-2 rounded-md border border-[#333] bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+              <button
+                onClick={downloadMerged}
+                disabled={!outpaintImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+              >
                 {isProcessing ? "Processing..." : "Download Merged PNG"}
               </button>
-              <button onClick={downloadOgTransparent} disabled={!ogImage || isProcessing}
-                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+              <button
+                onClick={downloadOgTransparent}
+                disabled={!ogImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+              >
                 OG on Transparent
               </button>
-              <button onClick={downloadMask} disabled={!ogImage || isProcessing}
-                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+              <button
+                onClick={downloadMask}
+                disabled={!ogImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+              >
                 B/W Feather Mask
               </button>
-              <button onClick={downloadOutpaint} disabled={!outpaintImage || isProcessing}
-                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+              <button
+                onClick={downloadOutpaint}
+                disabled={!outpaintImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+              >
                 Outpaint Background
               </button>
-              <button onClick={downloadPsd} disabled={!outpaintImage || isProcessing}
-                className="px-4 py-2 rounded-md border border-[#333] bg-purple-700 hover:bg-purple-600 active:bg-purple-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
+              <button
+                onClick={downloadPsd}
+                disabled={!outpaintImage || isProcessing}
+                className="px-4 py-2 rounded-md border border-[#333] bg-purple-700 hover:bg-purple-600 active:bg-purple-500 text-white cursor-pointer text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+              >
                 {isProcessing ? "Processing..." : "Download PSD (Layers)"}
               </button>
             </div>
 
             {/* Instructions */}
             <div className="mt-4 p-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-slate-400">
-              <p className="mb-1"><strong className="text-slate-200">How to use:</strong></p>
+              <p className="mb-1">
+                <strong className="text-slate-200">How to use:</strong>
+              </p>
               <ol className="list-decimal list-inside space-y-1">
-                <li>Upload the <strong>OG image</strong> — canvas sizes to it</li>
-                <li>Upload the <strong>Prepper output</strong> (gray-bordered image) — canvas expands, OG auto-positioned</li>
-                <li>Upload the <strong>Gemini outpaint</strong> — placed as background layer under OG</li>
-                <li>Fine-tune position by <strong>dragging</strong> or <strong>arrow keys</strong></li>
-                <li>Adjust <strong>feather strength</strong> for seamless edge blending</li>
-                <li>Toggle layers for <strong>A/B comparison</strong></li>
-                <li><strong>Download</strong> the merged result</li>
+                <li>
+                  Upload the <strong>OG image</strong> — canvas sizes to it
+                </li>
+                <li>
+                  Upload the <strong>Prepper output</strong> (gray-bordered
+                  image) — canvas expands, OG auto-positioned
+                </li>
+                <li>
+                  Upload the <strong>Gemini outpaint</strong> — placed as
+                  background layer under OG
+                </li>
+                <li>
+                  Fine-tune position by <strong>dragging</strong> or{" "}
+                  <strong>arrow keys</strong>
+                </li>
+                <li>
+                  Adjust <strong>feather strength</strong> for seamless edge
+                  blending
+                </li>
+                <li>
+                  Toggle layers for <strong>A/B comparison</strong>
+                </li>
+                <li>
+                  <strong>Download</strong> the merged result
+                </li>
               </ol>
             </div>
           </div>
@@ -2574,7 +2993,9 @@
       }
 
       function App() {
-        const [page, setPage] = useState(window.location.hash === "#/merger" ? "merger" : "prepper");
+        const [page, setPage] = useState(
+          window.location.hash === "#/merger" ? "merger" : "prepper",
+        );
 
         useEffect(() => {
           const onHash = () => {
@@ -2593,16 +3014,26 @@
         return (
           <div>
             <nav className="flex gap-1 p-2 bg-[#0a0a0a] border-b border-[#333]">
-              <a href="#/" onClick={() => setPage("prepper")}
-                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "prepper" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>
+              <a
+                href="#/"
+                onClick={() => setPage("prepper")}
+                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "prepper" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
+              >
                 Prepper
               </a>
-              <a href="#/merger" onClick={() => setPage("merger")}
-                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "merger" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>
+              <a
+                href="#/merger"
+                onClick={() => setPage("merger")}
+                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "merger" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
+              >
                 Merger
               </a>
             </nav>
-            {page === "prepper" ? <DetailPreserveImageResizer /> : <ImageMerger />}
+            {page === "prepper" ? (
+              <DetailPreserveImageResizer />
+            ) : (
+              <ImageMerger />
+            )}
           </div>
         );
       }
