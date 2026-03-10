@@ -1613,6 +1613,153 @@
         );
       }
 
+      // Seeded PRNG (mulberry32) for deterministic noise
+      function mulberry32(seed) {
+        return function() {
+          seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+          let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+          t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+          return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+      }
+
+      // Shared mask canvas generator — returns a canvas with white mask shape on transparent bg.
+      // Used by applyFeatheredMask, drawPreview mask, downloadMask, and PSD export.
+      function generateMaskCanvas(w, h, feather, radius, irregularity, seed) {
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        const inset = feather;
+
+        if (inset * 2 >= w || inset * 2 >= h) {
+          // Feather too large, fill entire rect
+          ctx.fillStyle = "white";
+          ctx.fillRect(0, 0, w, h);
+          return canvas;
+        }
+
+        const ix = inset;
+        const iy = inset;
+        const iw = w - inset * 2;
+        const ih = h - inset * 2;
+        const r = Math.min(radius, Math.min(iw, ih) / 2);
+
+        ctx.filter = feather > 0 ? `blur(${feather / 2}px)` : "none";
+        ctx.fillStyle = "white";
+
+        if (irregularity > 0) {
+          // Generate wobbly path using seeded noise
+          const rng = mulberry32(seed);
+          const step = 8; // sample every ~8px along perimeter
+          const maxDisp = irregularity * 1.5; // max displacement in px
+
+          // Generate smooth noise: sample at intervals, then interpolate
+          const perim = 2 * (iw + ih);
+          const nSamples = Math.max(16, Math.ceil(perim / step));
+          // Pre-generate noise values for smooth interpolation
+          const noiseVals = [];
+          for (let i = 0; i < nSamples; i++) noiseVals.push((rng() - 0.5) * 2 * maxDisp);
+          // Smooth the noise by averaging neighbors (2 passes)
+          for (let pass = 0; pass < 2; pass++) {
+            const smoothed = [];
+            for (let i = 0; i < nSamples; i++) {
+              const prev = noiseVals[(i - 1 + nSamples) % nSamples];
+              const curr = noiseVals[i];
+              const next = noiseVals[(i + 1) % nSamples];
+              smoothed.push((prev + curr * 2 + next) / 4);
+            }
+            for (let i = 0; i < nSamples; i++) noiseVals[i] = smoothed[i];
+          }
+
+          // Walk the perimeter of the (rounded) rectangle and displace points
+          const points = [];
+          const cx = ix + iw / 2;
+          const cy = iy + ih / 2;
+
+          for (let i = 0; i < nSamples; i++) {
+            const t = i / nSamples;
+            const d = t * perim;
+            let px, py, nx, ny; // point + normal
+
+            if (d < iw - 2 * r) {
+              // Top edge (left to right, after top-left corner)
+              px = ix + r + d; py = iy;
+              nx = 0; ny = -1;
+            } else if (d < iw - 2 * r + Math.PI * r / 2) {
+              // Top-right corner arc
+              const arcD = d - (iw - 2 * r);
+              const angle = -Math.PI / 2 + arcD / r;
+              px = ix + iw - r + Math.cos(angle) * r;
+              py = iy + r + Math.sin(angle) * r;
+              nx = Math.cos(angle); ny = Math.sin(angle);
+            } else if (d < iw - 2 * r + Math.PI * r / 2 + ih - 2 * r) {
+              // Right edge (top to bottom)
+              const edgeD = d - (iw - 2 * r + Math.PI * r / 2);
+              px = ix + iw; py = iy + r + edgeD;
+              nx = 1; ny = 0;
+            } else if (d < iw - 2 * r + Math.PI * r + ih - 2 * r) {
+              // Bottom-right corner arc
+              const arcD = d - (iw - 2 * r + Math.PI * r / 2 + ih - 2 * r);
+              const angle = 0 + arcD / r;
+              px = ix + iw - r + Math.cos(angle) * r;
+              py = iy + ih - r + Math.sin(angle) * r;
+              nx = Math.cos(angle); ny = Math.sin(angle);
+            } else if (d < 2 * (iw - 2 * r) + Math.PI * r + ih - 2 * r) {
+              // Bottom edge (right to left)
+              const edgeD = d - (iw - 2 * r + Math.PI * r + ih - 2 * r);
+              px = ix + iw - r - edgeD; py = iy + ih;
+              nx = 0; ny = 1;
+            } else if (d < 2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r) {
+              // Bottom-left corner arc
+              const arcD = d - (2 * (iw - 2 * r) + Math.PI * r + ih - 2 * r);
+              const angle = Math.PI / 2 + arcD / r;
+              px = ix + r + Math.cos(angle) * r;
+              py = iy + ih - r + Math.sin(angle) * r;
+              nx = Math.cos(angle); ny = Math.sin(angle);
+            } else if (d < 2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r)) {
+              // Left edge (bottom to top)
+              const edgeD = d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + ih - 2 * r);
+              px = ix; py = iy + ih - r - edgeD;
+              nx = -1; ny = 0;
+            } else {
+              // Top-left corner arc
+              const arcD = d - (2 * (iw - 2 * r) + 1.5 * Math.PI * r + 2 * (ih - 2 * r));
+              const angle = Math.PI + arcD / r;
+              px = ix + r + Math.cos(angle) * r;
+              py = iy + r + Math.sin(angle) * r;
+              nx = Math.cos(angle); ny = Math.sin(angle);
+            }
+
+            points.push({ x: px + nx * noiseVals[i], y: py + ny * noiseVals[i] });
+          }
+
+          // Draw filled path
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            const prev = points[(i - 1 + points.length) % points.length];
+            const curr = points[i];
+            const next = points[(i + 1) % points.length];
+            // Smooth curve through points
+            const cpx = curr.x;
+            const cpy = curr.y;
+            ctx.lineTo(cpx, cpy);
+          }
+          ctx.closePath();
+          ctx.fill();
+        } else if (r > 0) {
+          ctx.beginPath();
+          ctx.roundRect(ix, iy, iw, ih, r);
+          ctx.fill();
+        } else {
+          ctx.fillRect(ix, iy, iw, ih);
+        }
+
+        ctx.filter = "none";
+        return canvas;
+      }
+
       function ImageMerger() {
         const canvasRef = useRef(null);
         const [ogImage, setOgImage] = useState(null);
@@ -1623,6 +1770,10 @@
         const [canvasScale, setCanvasScale] = useState(0.25);
         const [ogState, setOgState] = useState({ x: 0, y: 0, w: 0, h: 0 });
         const [featherStrength, setFeatherStrength] = useState(40);
+        const [ogScale, setOgScale] = useState(100);
+        const [maskRadius, setMaskRadius] = useState(0);
+        const [irregularity, setIrregularity] = useState(0);
+        const [irregSeed, setIrregSeed] = useState(() => Math.floor(Math.random() * 2147483647));
         const [layers, setLayers] = useState({
           og: true,
           outpaint: true,
@@ -1647,6 +1798,8 @@
             setCanvasW(w);
             setCanvasH(h);
             setOgState({ x: 0, y: 0, w, h });
+            setOgScale(100);
+            setIrregSeed(Math.floor(Math.random() * 2147483647));
             setAlignmentStatus(`OG loaded: ${w}x${h}px. Now upload the prepper output (gray-bordered guide).`);
           };
           img.src = URL.createObjectURL(file);
@@ -1722,6 +1875,7 @@
           setCanvasW(newCanvasW);
           setCanvasH(newCanvasH);
           setOgState({ x: newX, y: newY, w: ogW, h: ogH });
+          setOgScale(100);
           setAlignmentStatus(
             `Canvas expanded to ${newCanvasW}x${newCanvasH}. OG placed at (${newX}, ${newY}). Now upload the Gemini outpaint.`
           );
@@ -1739,8 +1893,24 @@
           img.src = URL.createObjectURL(file);
         };
 
+        // OG scale effect — resize OG around its center when scale changes
+        useEffect(() => {
+          if (!ogImage) return;
+          const natW = ogImage.naturalWidth;
+          const natH = ogImage.naturalHeight;
+          const newW = Math.round(natW * ogScale / 100);
+          const newH = Math.round(natH * ogScale / 100);
+          setOgState((s) => ({
+            ...s,
+            w: newW,
+            h: newH,
+            x: Math.round(s.x + (s.w - newW) / 2),
+            y: Math.round(s.y + (s.h - newH) / 2),
+          }));
+        }, [ogScale, ogImage]);
+
         // Feathered mask compositing — fixed: transparent base so alpha fades properly
-        const applyFeatheredMask = useCallback((ctx, ogImg, x, y, w, h, feather) => {
+        const applyFeatheredMask = useCallback((ctx, ogImg, x, y, w, h, feather, radius, irreg, seed) => {
           const temp = document.createElement("canvas");
           temp.width = w;
           temp.height = h;
@@ -1749,31 +1919,14 @@
           // Draw OG image
           tctx.drawImage(ogImg, 0, 0, ogImg.naturalWidth, ogImg.naturalHeight, 0, 0, w, h);
 
-          if (feather <= 0) {
-            // No feathering, draw directly
+          if (feather <= 0 && radius <= 0 && irreg <= 0) {
+            // No feathering/shaping, draw directly
             ctx.drawImage(temp, x, y);
             return;
           }
 
-          // Create feather mask on a TRANSPARENT canvas (not black-filled!)
-          // destination-in uses the ALPHA channel — only transparent vs opaque matters
-          const mask = document.createElement("canvas");
-          mask.width = w;
-          mask.height = h;
-          const mctx = mask.getContext("2d");
-          // Canvas starts transparent — that's the key fix
-
-          const inset = feather;
-          if (inset * 2 < w && inset * 2 < h) {
-            mctx.filter = `blur(${feather / 2}px)`;
-            mctx.fillStyle = "white";
-            mctx.fillRect(inset, inset, w - inset * 2, h - inset * 2);
-            mctx.filter = "none";
-          } else {
-            // Feather too large relative to image, just show full
-            mctx.fillStyle = "white";
-            mctx.fillRect(0, 0, w, h);
-          }
+          // Generate mask using shared helper
+          const mask = generateMaskCanvas(w, h, feather, radius, irreg, seed);
 
           // Apply mask: keeps OG pixels where mask is opaque, fades where mask is transparent
           tctx.globalCompositeOperation = "destination-in";
@@ -1799,32 +1952,21 @@
 
           // OG with feathered mask
           if (layers.og && ogImage && ogState.w > 0) {
-            applyFeatheredMask(ctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+            applyFeatheredMask(ctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
           }
 
           // Mask preview overlay (B/W visualization)
           if (layers.mask && ogState.w > 0) {
-            const mask = document.createElement("canvas");
-            mask.width = canvasW;
-            mask.height = canvasH;
-            const mctx = mask.getContext("2d");
-            // Black background for mask preview
+            const maskPreview = document.createElement("canvas");
+            maskPreview.width = canvasW;
+            maskPreview.height = canvasH;
+            const mctx = maskPreview.getContext("2d");
             mctx.fillStyle = "black";
             mctx.fillRect(0, 0, canvasW, canvasH);
-            const inset = featherStrength;
-            const mw = ogState.w;
-            const mh = ogState.h;
-            if (inset * 2 < mw && inset * 2 < mh) {
-              mctx.filter = `blur(${featherStrength / 2}px)`;
-              mctx.fillStyle = "white";
-              mctx.fillRect(ogState.x + inset, ogState.y + inset, mw - inset * 2, mh - inset * 2);
-              mctx.filter = "none";
-            } else {
-              mctx.fillStyle = "white";
-              mctx.fillRect(ogState.x, ogState.y, mw, mh);
-            }
+            const shapeMask = generateMaskCanvas(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+            mctx.drawImage(shapeMask, ogState.x, ogState.y);
             ctx.globalAlpha = 0.5;
-            ctx.drawImage(mask, 0, 0);
+            ctx.drawImage(maskPreview, 0, 0);
             ctx.globalAlpha = 1.0;
           }
 
@@ -1843,7 +1985,7 @@
             ctx.strokeRect(ogState.x, ogState.y, ogState.w, ogState.h);
             ctx.setLineDash([]);
           }
-        }, [ogImage, outpaintImage, guideImage, ogState, layers, canvasW, canvasH, featherStrength, applyFeatheredMask]);
+        }, [ogImage, outpaintImage, guideImage, ogState, layers, canvasW, canvasH, featherStrength, maskRadius, irregularity, irregSeed, applyFeatheredMask]);
 
         // Canvas size + redraw
         useEffect(() => {
@@ -1854,7 +1996,7 @@
           drawPreview();
         }, [drawPreview, canvasW, canvasH]);
 
-        useEffect(() => drawPreview(), [drawPreview, ogState, layers, featherStrength]);
+        useEffect(() => drawPreview(), [drawPreview, ogState, layers, featherStrength, maskRadius, irregularity, irregSeed]);
 
         // Responsive scaling
         useEffect(() => {
@@ -1980,7 +2122,7 @@
           const fctx = final.getContext("2d");
           fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
           if (ogImage && ogState.w > 0) {
-            applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+            applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
           }
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
@@ -2004,7 +2146,7 @@
           final.width = canvasW;
           final.height = canvasH;
           const fctx = final.getContext("2d");
-          applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+          applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
             const url = URL.createObjectURL(blob);
@@ -2029,15 +2171,8 @@
           const fctx = final.getContext("2d");
           fctx.fillStyle = "black";
           fctx.fillRect(0, 0, canvasW, canvasH);
-          const inset = featherStrength;
-          const mw = ogState.w;
-          const mh = ogState.h;
-          if (inset * 2 < mw && inset * 2 < mh) {
-            fctx.filter = `blur(${featherStrength / 2}px)`;
-            fctx.fillStyle = "white";
-            fctx.fillRect(ogState.x + inset, ogState.y + inset, mw - inset * 2, mh - inset * 2);
-            fctx.filter = "none";
-          }
+          const shapeMask = generateMaskCanvas(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+          fctx.drawImage(shapeMask, ogState.x, ogState.y);
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
             const url = URL.createObjectURL(blob);
@@ -2105,7 +2240,7 @@
                 ogCanvas.width = canvasW;
                 ogCanvas.height = canvasH;
                 const ogCtx = ogCanvas.getContext("2d");
-                applyFeatheredMask(ogCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+                applyFeatheredMask(ogCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
 
                 children.push({
                   name: "OG Card (Feathered)",
@@ -2121,13 +2256,8 @@
                 const mctx = maskCanvas.getContext("2d");
                 mctx.fillStyle = "black";
                 mctx.fillRect(0, 0, canvasW, canvasH);
-                const inset = featherStrength;
-                if (inset * 2 < ogState.w && inset * 2 < ogState.h) {
-                  mctx.filter = `blur(${featherStrength / 2}px)`;
-                  mctx.fillStyle = "white";
-                  mctx.fillRect(ogState.x + inset, ogState.y + inset, ogState.w - inset * 2, ogState.h - inset * 2);
-                  mctx.filter = "none";
-                }
+                const shapeMask = generateMaskCanvas(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+                mctx.drawImage(shapeMask, ogState.x, ogState.y);
 
                 children.push({
                   name: "Feather Mask",
@@ -2145,7 +2275,7 @@
               const mergedCtx = mergedCanvas.getContext("2d");
               mergedCtx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
               if (ogImage && ogState.w > 0) {
-                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength);
+                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
               }
 
               children.push({
@@ -2217,15 +2347,39 @@
               )}
             </div>
 
-            {/* Controls row */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-4 items-stretch sm:items-center flex-wrap">
-              {/* Feather strength */}
-              <label className="flex items-center gap-2 text-sm">
-                <span className="text-slate-300 whitespace-nowrap">Feather: {featherStrength}px</span>
-                <input type="range" min="0" max="200" step="1" value={featherStrength}
-                  onChange={(e) => setFeatherStrength(Number(e.target.value))}
-                  className="w-32 sm:w-48 accent-emerald-500" />
-              </label>
+            {/* Controls */}
+            <div className="flex flex-col gap-3 mb-4">
+              {/* Sliders */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <label className="flex items-center gap-2">
+                  <span className="text-slate-300 whitespace-nowrap w-36">OG Scale: {ogScale}%</span>
+                  <input type="range" min="10" max="200" step="1" value={ogScale}
+                    onChange={(e) => setOgScale(Number(e.target.value))}
+                    disabled={!ogImage}
+                    className="flex-1 accent-emerald-500" />
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="text-slate-300 whitespace-nowrap w-36">Feather: {featherStrength}px</span>
+                  <input type="range" min="0" max="200" step="1" value={featherStrength}
+                    onChange={(e) => setFeatherStrength(Number(e.target.value))}
+                    disabled={!ogImage}
+                    className="flex-1 accent-emerald-500" />
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="text-slate-300 whitespace-nowrap w-36">Radius: {maskRadius}px</span>
+                  <input type="range" min="0" max="500" step="1" value={maskRadius}
+                    onChange={(e) => setMaskRadius(Number(e.target.value))}
+                    disabled={!ogImage}
+                    className="flex-1 accent-emerald-500" />
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="text-slate-300 whitespace-nowrap w-36">Irregularity: {irregularity}</span>
+                  <input type="range" min="0" max="100" step="1" value={irregularity}
+                    onChange={(e) => setIrregularity(Number(e.target.value))}
+                    disabled={!ogImage}
+                    className="flex-1 accent-emerald-500" />
+                </label>
+              </div>
 
               {/* Layer toggles */}
               <div className="flex items-center gap-3 text-sm flex-wrap">
@@ -2254,7 +2408,7 @@
               {/* Position display */}
               {ogImage && (
                 <span className="text-xs text-slate-400">
-                  OG pos: ({ogState.x}, {ogState.y}) | size: {ogState.w}x{ogState.h} | canvas: {canvasW}x{canvasH}
+                  OG pos: ({ogState.x}, {ogState.y}) | size: {ogState.w}x{ogState.h} | scale: {ogScale}% | canvas: {canvasW}x{canvasH}
                 </span>
               )}
             </div>
