@@ -1753,12 +1753,25 @@
       }
 
       // Combined mask: intersect feather mask (A) with density-adjusted irregular mask (B).
-      function generateCombinedMask(w, h, feather, radius, irregularity, irregRadius, irregDensity, seed) {
+      function generateCombinedMask(w, h, feather, radius, irregularity, irregRadius, irregDensity, seed, irregBlur) {
         const maskA = generateFeatherMask(w, h, feather, radius);
 
         if (irregularity <= 0 || irregDensity <= 0) return maskA;
 
         const maskB = generateIrregularMask(w, h, irregRadius, irregularity, seed);
+
+        // Apply gaussian blur to irregular mask edges
+        if (irregBlur > 0) {
+          const bctx = maskB.getContext("2d");
+          const blurred = document.createElement("canvas");
+          blurred.width = w;
+          blurred.height = h;
+          const blurCtx = blurred.getContext("2d");
+          blurCtx.filter = `blur(${irregBlur}px)`;
+          blurCtx.drawImage(maskB, 0, 0);
+          bctx.clearRect(0, 0, w, h);
+          bctx.drawImage(blurred, 0, 0);
+        }
 
         // Apply density: partially fill eroded areas back in (density < 100 weakens the erosion)
         if (irregDensity < 100) {
@@ -1796,6 +1809,7 @@
         const [irregSeed, setIrregSeed] = useState(() => Math.floor(Math.random() * 2147483647));
         const [irregDensity, setIrregDensity] = useState(100);
         const [irregRadius, setIrregRadius] = useState(0);
+        const [irregBlur, setIrregBlur] = useState(0);
         const [layers, setLayers] = useState({
           og: true,
           outpaint: true,
@@ -1932,7 +1946,7 @@
         }, [ogScale, ogImage]);
 
         // Feathered mask compositing — fixed: transparent base so alpha fades properly
-        const applyFeatheredMask = useCallback((ctx, ogImg, x, y, w, h, feather, radius, irreg, seed, irregRad, irregDens) => {
+        const applyFeatheredMask = useCallback((ctx, ogImg, x, y, w, h, feather, radius, irreg, seed, irregRad, irregDens, iBlur) => {
           const temp = document.createElement("canvas");
           temp.width = w;
           temp.height = h;
@@ -1945,7 +1959,7 @@
             return;
           }
 
-          const mask = generateCombinedMask(w, h, feather, radius, irreg, irregRad, irregDens, seed);
+          const mask = generateCombinedMask(w, h, feather, radius, irreg, irregRad, irregDens, seed, iBlur);
 
           tctx.globalCompositeOperation = "destination-in";
           tctx.drawImage(mask, 0, 0);
@@ -1970,7 +1984,7 @@
 
           // OG with feathered mask
           if (layers.og && ogImage && ogState.w > 0) {
-            applyFeatheredMask(ctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
+            applyFeatheredMask(ctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity, irregBlur);
           }
 
           // Mask preview overlay (B/W visualization)
@@ -1981,7 +1995,7 @@
             const mctx = maskPreview.getContext("2d");
             mctx.fillStyle = "black";
             mctx.fillRect(0, 0, canvasW, canvasH);
-            const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed);
+            const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed, irregBlur);
             mctx.drawImage(shapeMask, ogState.x, ogState.y);
             ctx.globalAlpha = 0.5;
             ctx.drawImage(maskPreview, 0, 0);
@@ -2003,7 +2017,7 @@
             ctx.strokeRect(ogState.x, ogState.y, ogState.w, ogState.h);
             ctx.setLineDash([]);
           }
-        }, [ogImage, outpaintImage, guideImage, ogState, layers, canvasW, canvasH, featherStrength, maskRadius, irregularity, irregSeed, irregDensity, irregRadius, applyFeatheredMask]);
+        }, [ogImage, outpaintImage, guideImage, ogState, layers, canvasW, canvasH, featherStrength, maskRadius, irregularity, irregSeed, irregDensity, irregRadius, irregBlur, applyFeatheredMask]);
 
         // Canvas size + redraw
         useEffect(() => {
@@ -2014,7 +2028,7 @@
           drawPreview();
         }, [drawPreview, canvasW, canvasH]);
 
-        useEffect(() => drawPreview(), [drawPreview, ogState, layers, featherStrength, maskRadius, irregularity, irregSeed, irregDensity, irregRadius]);
+        useEffect(() => drawPreview(), [drawPreview, ogState, layers, featherStrength, maskRadius, irregularity, irregSeed, irregDensity, irregRadius, irregBlur]);
 
         // Responsive scaling
         useEffect(() => {
@@ -2140,7 +2154,7 @@
           const fctx = final.getContext("2d");
           fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
           if (ogImage && ogState.w > 0) {
-            applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
+            applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity, irregBlur);
           }
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
@@ -2164,7 +2178,7 @@
           final.width = canvasW;
           final.height = canvasH;
           const fctx = final.getContext("2d");
-          applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
+          applyFeatheredMask(fctx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity, irregBlur);
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
             const url = URL.createObjectURL(blob);
@@ -2189,7 +2203,7 @@
           const fctx = final.getContext("2d");
           fctx.fillStyle = "black";
           fctx.fillRect(0, 0, canvasW, canvasH);
-          const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed);
+          const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed, irregBlur);
           fctx.drawImage(shapeMask, ogState.x, ogState.y);
           final.toBlob((blob) => {
             if (!blob) { setIsProcessing(false); return; }
@@ -2262,7 +2276,7 @@
               const mergedCtx = mergedCanvas.getContext("2d");
               mergedCtx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
               if (ogImage && ogState.w > 0) {
-                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity);
+                applyFeatheredMask(mergedCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed, irregRadius, irregDensity, irregBlur);
               }
 
               children.push({
@@ -2301,7 +2315,7 @@
                 const pmctx = psdMaskCanvas.getContext("2d");
                 pmctx.fillStyle = "black";
                 pmctx.fillRect(0, 0, canvasW, canvasH);
-                const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed);
+                const shapeMask = generateCombinedMask(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregRadius, irregDensity, irregSeed, irregBlur);
                 pmctx.drawImage(shapeMask, ogState.x, ogState.y);
 
                 children.push({
@@ -2439,6 +2453,13 @@
                     <input type="range" min="0" max="500" step="1" value={irregRadius}
                       onChange={(e) => setIrregRadius(Number(e.target.value))}
                       disabled={!ogImage}
+                      className="flex-1 accent-emerald-500" />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <span className="text-slate-300 whitespace-nowrap w-36">Edge Blur: {irregBlur}px</span>
+                    <input type="range" min="0" max="100" step="1" value={irregBlur}
+                      onChange={(e) => setIrregBlur(Number(e.target.value))}
+                      disabled={!ogImage || irregularity <= 0}
                       className="flex-1 accent-emerald-500" />
                   </label>
                   <div className="flex items-center">
