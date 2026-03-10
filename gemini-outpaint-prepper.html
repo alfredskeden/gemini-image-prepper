@@ -2235,36 +2235,51 @@
               });
 
               if (ogImage && ogState.w > 0) {
-                // Layer 2: OG Card (Feathered)
+                // Layer 2: OG Unfeathered (raw card, no mask, hidden)
+                const ogRawCanvas = document.createElement("canvas");
+                ogRawCanvas.width = canvasW;
+                ogRawCanvas.height = canvasH;
+                const ogRawCtx = ogRawCanvas.getContext("2d");
+                ogRawCtx.drawImage(ogImage, ogState.x, ogState.y, ogState.w, ogState.h);
+
+                children.push({
+                  name: "OG Unfeathered",
+                  canvas: ogRawCanvas,
+                  left: 0,
+                  top: 0,
+                  hidden: true,
+                });
+
+                // Layer 3: OG Card with feather mask as PSD layer mask
                 const ogCanvas = document.createElement("canvas");
                 ogCanvas.width = canvasW;
                 ogCanvas.height = canvasH;
                 const ogCtx = ogCanvas.getContext("2d");
-                applyFeatheredMask(ogCtx, ogImage, ogState.x, ogState.y, ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+                ogCtx.drawImage(ogImage, ogState.x, ogState.y, ogState.w, ogState.h);
+
+                // Build grayscale mask canvas (white=visible, black=hidden)
+                const psdMaskCanvas = document.createElement("canvas");
+                psdMaskCanvas.width = canvasW;
+                psdMaskCanvas.height = canvasH;
+                const pmctx = psdMaskCanvas.getContext("2d");
+                pmctx.fillStyle = "black";
+                pmctx.fillRect(0, 0, canvasW, canvasH);
+                const shapeMask = generateMaskCanvas(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
+                pmctx.drawImage(shapeMask, ogState.x, ogState.y);
 
                 children.push({
-                  name: "OG Card (Feathered)",
+                  name: "OG Card",
                   canvas: ogCanvas,
                   left: 0,
                   top: 0,
-                });
-
-                // Layer 3: Feather Mask (hidden)
-                const maskCanvas = document.createElement("canvas");
-                maskCanvas.width = canvasW;
-                maskCanvas.height = canvasH;
-                const mctx = maskCanvas.getContext("2d");
-                mctx.fillStyle = "black";
-                mctx.fillRect(0, 0, canvasW, canvasH);
-                const shapeMask = generateMaskCanvas(ogState.w, ogState.h, featherStrength, maskRadius, irregularity, irregSeed);
-                mctx.drawImage(shapeMask, ogState.x, ogState.y);
-
-                children.push({
-                  name: "Feather Mask",
-                  canvas: maskCanvas,
-                  left: 0,
-                  top: 0,
-                  hidden: true,
+                  mask: {
+                    top: 0,
+                    left: 0,
+                    bottom: canvasH,
+                    right: canvasW,
+                    canvas: psdMaskCanvas,
+                    defaultColor: 0,
+                  },
                 });
               }
 
