@@ -989,6 +989,10 @@
                   ogImage: imageObj,
                   guideImage: guideImg,
                   guideUrl: guideUrl,
+                  promptHandshake:
+                    document.getElementById("outpaint-1")?.value || "",
+                  promptOutpaint:
+                    document.getElementById("outpaint-2")?.value || "",
                 };
                 window.location.hash = "#/merger";
                 setIsProcessing(false);
@@ -1039,20 +1043,24 @@
             const ta = document.getElementById(id);
             if (!ta) return;
 
-            // Work with the textarea value (stable)
             const val = ta.value || ta.innerText || "";
 
-            // Replace any existing line that starts with "6." (first such occurrence)
-            // Use multiline regex to target the line beginning with optional whitespace then "6."
-            const replaced = val.replace(/^[ \t]*6\..*$/m, newLine);
-
-            if (replaced !== val) {
-              // we replaced an existing line
-              ta.value = replaced;
-            } else {
-              // no existing "6." line found — append it separated by two newlines for clarity
-              ta.value = (val.trim() ? val.trim() + "\n\n" : "") + newLine;
+            // Remove all existing "6." lines, then insert the new one at the first removal point
+            let inserted = false;
+            const lines = val.split("\n");
+            const result = [];
+            for (const line of lines) {
+              if (/^\s*6\./.test(line)) {
+                if (!inserted) {
+                  result.push(newLine);
+                  inserted = true;
+                }
+                // skip duplicate "6." lines
+              } else {
+                result.push(line);
+              }
             }
+            ta.value = result.join("\n");
           });
         }, [canvasW, canvasH]);
 
@@ -1885,6 +1893,8 @@
         const [dragOffset, setDragOffset] = useState({ dx: 0, dy: 0 });
         const [isProcessing, setIsProcessing] = useState(false);
         const [alignmentStatus, setAlignmentStatus] = useState("");
+        const [promptHandshake, setPromptHandshake] = useState("");
+        const [promptOutpaint, setPromptOutpaint] = useState("");
 
         // Consume handoff from Prepper (one-shot)
         useEffect(() => {
@@ -1892,7 +1902,16 @@
           if (!handoff) return;
           window.__prepperHandoff = null;
 
-          const { ogImage: og, guideImage: guide, guideUrl } = handoff;
+          const {
+            ogImage: og,
+            guideImage: guide,
+            guideUrl,
+            promptHandshake: ph,
+            promptOutpaint: po,
+          } = handoff;
+
+          if (ph) setPromptHandshake(ph);
+          if (po) setPromptOutpaint(po);
 
           setOgImage(og);
           setCanvasW(og.naturalWidth);
@@ -2680,6 +2699,63 @@
 
         return (
           <div className="p-3 sm:p-4 md:p-6 max-w-full">
+            {/* Outpaint Prompts (carried from Prepper) */}
+            {ogImage && promptHandshake && (
+              <div className="mb-4 p-3 sm:p-4 border border-[#333] rounded-lg bg-[#0a0a0a]">
+                <h3 className="m-0 mb-2 font-semibold text-white text-base sm:text-lg">
+                  outpaint prompts
+                </h3>
+                <div className="flex flex-col gap-2 sm:gap-3">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-start">
+                    <div className="flex-1 w-full">
+                      <label className="block text-sm sm:text-base text-[#ddd] mb-1">
+                        First the handshake
+                      </label>
+                      <textarea
+                        readOnly
+                        rows={4}
+                        value={promptHandshake}
+                        className="w-full p-2 sm:p-3 rounded-md border border-[#444] bg-[#0b0b0b] text-[#eee] font-mono text-xs sm:text-sm resize-y"
+                      />
+                    </div>
+                    <div className="self-end sm:self-end mt-2 sm:mt-0">
+                      <button
+                        onClick={(e) =>
+                          window.__copyText?.(promptHandshake, e.currentTarget)
+                        }
+                        className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm sm:text-base transition-colors min-h-[44px]"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-start">
+                    <div className="flex-1 w-full">
+                      <label className="block text-sm sm:text-base text-[#ddd] mb-1">
+                        Now the out-paint command (attach the grey bordered
+                        image)
+                      </label>
+                      <textarea
+                        readOnly
+                        rows={4}
+                        value={promptOutpaint}
+                        className="w-full p-2 sm:p-3 rounded-md border border-[#444] bg-[#0b0b0b] text-[#eee] font-mono text-xs sm:text-sm resize-y"
+                      />
+                    </div>
+                    <div className="self-end sm:self-end mt-2 sm:mt-0">
+                      <button
+                        onClick={(e) =>
+                          window.__copyText?.(promptOutpaint, e.currentTarget)
+                        }
+                        className="px-4 py-2 rounded-md border border-[#333] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white cursor-pointer text-sm sm:text-base transition-colors min-h-[44px]"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center sm:text-left">
               Outpaint Merger
               <span
@@ -3134,7 +3210,7 @@ The Master Rules:
 
 5. Anti-Mirror/Anti-Tile: Do not mirror or repeat the core image.
 
-6. 5:7 Vertical Ratio: Output in Portrait 5:7 aspect ratio.
+6. 11:15 Vertical Ratio: Output in Portrait orientation 11:15 aspect ratio.
 
 
 Confirmation: Respond only with: "Universal Neutral Extension Mode Locked. Ready for any input."</textarea
@@ -3185,48 +3261,9 @@ Strict Directives:
     </div>
 
     <script>
-      // Copy-to-clipboard behavior for the two outpaint boxes.
+      // Shared copy-to-clipboard utility exposed as window.__copyText
       (function () {
-        function copyHandler(e) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          const targetId = e.currentTarget.getAttribute("data-target");
-          const ta = document.getElementById(targetId);
-          if (!ta) return;
-          const text = ta.value;
-
-          if (!text || text.trim() === "") {
-            alert("Nothing to copy");
-            return;
-          }
-
-          const button = e.currentTarget;
-          const originalText = button.innerText;
-
-          // Try modern clipboard API first
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard
-              .writeText(text)
-              .then(() => {
-                button.innerText = "Copied!";
-                setTimeout(() => {
-                  button.innerText = originalText;
-                }, 1400);
-              })
-              .catch((err) => {
-                console.warn("Clipboard API failed:", err);
-                // Fallback to execCommand with temporary element
-                fallbackCopyWithTempElement(text, button, originalText);
-              });
-          } else {
-            // Very old browsers fallback
-            fallbackCopyWithTempElement(text, button, originalText);
-          }
-        }
-
         function fallbackCopyWithTempElement(text, button, originalText) {
-          // Create a temporary textarea element for copying (more reliable)
           const tempTextarea = document.createElement("textarea");
           tempTextarea.value = text;
           tempTextarea.style.position = "fixed";
@@ -3236,7 +3273,6 @@ Strict Directives:
           tempTextarea.setAttribute("readonly", "");
           document.body.appendChild(tempTextarea);
 
-          // Focus and select
           tempTextarea.focus();
           tempTextarea.select();
           tempTextarea.setSelectionRange(0, text.length);
@@ -3251,49 +3287,55 @@ Strict Directives:
                 button.innerText = originalText;
               }, 1400);
             } else {
-              // Last resort: try with original textarea
-              fallbackCopyOriginal(text, button, originalText);
+              alert(
+                "Copy failed — please select the text manually and press Ctrl/Cmd+C",
+              );
             }
           } catch (err) {
             document.body.removeChild(tempTextarea);
             console.warn("execCommand failed:", err);
-            // Last resort: try with original textarea
-            fallbackCopyOriginal(text, button, originalText);
+            alert(
+              "Copy failed — please select the text manually and press Ctrl/Cmd+C",
+            );
           }
         }
 
-        function fallbackCopyOriginal(text, button, originalText) {
-          // Try to find and use the original textarea
-          const targetId = button.getAttribute("data-target");
-          const ta = document.getElementById(targetId);
-          if (ta) {
-            ta.focus();
-            ta.select();
-            ta.setSelectionRange(0, text.length);
+        window.__copyText = function (text, button) {
+          if (!text || text.trim() === "") {
+            alert("Nothing to copy");
+            return;
+          }
 
-            try {
-              const successful = document.execCommand("copy");
-              if (successful) {
+          const originalText = button.innerText;
+
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard
+              .writeText(text)
+              .then(() => {
                 button.innerText = "Copied!";
                 setTimeout(() => {
                   button.innerText = originalText;
                 }, 1400);
-                return;
-              }
-            } catch (err) {
-              console.warn("Original textarea copy failed:", err);
-            }
+              })
+              .catch((err) => {
+                console.warn("Clipboard API failed:", err);
+                fallbackCopyWithTempElement(text, button, originalText);
+              });
+          } else {
+            fallbackCopyWithTempElement(text, button, originalText);
           }
-
-          // If all else fails, show helpful message
-          alert(
-            "Copy failed — please select the text manually and press Ctrl/Cmd+C",
-          );
-        }
+        };
 
         document.addEventListener("DOMContentLoaded", function () {
           document.querySelectorAll(".copy-btn").forEach(function (btn) {
-            btn.addEventListener("click", copyHandler);
+            btn.addEventListener("click", function (e) {
+              e.preventDefault();
+              e.stopPropagation();
+              const targetId = e.currentTarget.getAttribute("data-target");
+              const ta = document.getElementById(targetId);
+              if (!ta) return;
+              window.__copyText(ta.value, e.currentTarget);
+            });
           });
         });
       })();
