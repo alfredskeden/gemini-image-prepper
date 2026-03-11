@@ -1711,7 +1711,7 @@
         const step = 8;
         const maxDisp = irregularity * 1.5;
 
-        const perim = 2 * (iw + ih);
+        const perim = 2 * (iw - 2 * r) + 2 * (ih - 2 * r) + 2 * Math.PI * r;
         const nSamples = Math.max(16, Math.ceil(perim / step));
         const noiseVals = [];
         for (let i = 0; i < nSamples; i++)
