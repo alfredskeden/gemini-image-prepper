@@ -57,6 +57,28 @@
       button:active {
         transform: scale(0.98);
       }
+
+      /* Google CSE dark-theme overrides for Art Hunt */
+      .gsc-control-cse, .gsc-control-cse-en { background: transparent !important; border: 0 !important; padding: 0 !important; font-family: Inter, system-ui, sans-serif !important; }
+      .gsc-control-cse .gsc-table-result, .gsc-control-cse .gsc-thumbnail-inside, .gsc-control-cse .gsc-url-top { font-family: Inter, system-ui, sans-serif !important; color: #ccc !important; }
+      .gsc-control-cse .gsc-search-box, .gsc-control-cse .gsc-above-wrapper-area, .gsc-control-cse .gsc-results-wrapper-visible { background: transparent !important; }
+      .gsc-input-box { border: 1px solid #444 !important; border-radius: 6px !important; background: #0b0b0b !important; height: 46px !important; }
+      input.gsc-input { background: #0b0b0b !important; color: #eee !important; font-size: 20px !important; padding-left: 8px !important; }
+      .gsc-search-button-v2, .gsc-search-button { border: 1px solid #444 !important; background: #1a1a1a !important; border-radius: 6px !important; padding: 0 18px !important; height: 46px !important; margin-left: 8px !important; }
+      .gsc-search-button-v2 svg { fill: #eee !important; }
+      .gs-webResult.gs-result, .gsc-result { border-bottom: 1px solid #333 !important; padding-bottom: 12px !important; margin-bottom: 12px !important; }
+      .gs-title, .gs-title b { color: #6ea8fe !important; text-decoration: underline !important; }
+      .gs-snippet, .gsc-result-info, .gcsc-find-more-on-google, .gsc-orderby-label, .gsc-selected-option-container, .gsc-option-menu-item { color: #ccc !important; }
+      .gs-visibleUrl { color: #94a3b8 !important; }
+      .gsc-tabHeader, .gsc-refinementHeader { border: 1px solid #444 !important; background: #1a1a1a !important; color: #eee !important; font-weight: 600 !important; margin-right: 8px !important; padding: 6px 10px !important; border-radius: 4px !important; }
+      .gsc-tabHeader.gsc-tabhActive, .gsc-refinementHeader.gsc-refinementhActive { background: #252525 !important; }
+      .gsc-cursor-page { color: #eee !important; border: 1px solid #444 !important; padding: 2px 8px !important; text-decoration: none !important; border-radius: 4px !important; }
+      .gsc-results-wrapper-overlay { background: #222222 !important; border: 1px solid #444 !important; border-radius: 8px !important; padding: 16px !important; }
+      .gsc-modal-background-image-visible { background: rgba(0,0,0,0.7) !important; }
+      .gsc-completion-container { background: #1a1a1a !important; border: 1px solid #444 !important; border-radius: 6px !important; }
+      .gsc-completion-selected { background: #252525 !important; }
+      .gsc-completion-container .gsc-completion-title { color: #eee !important; }
+      .gsc-modal-background-image { background: rgba(0,0,0,0.7) !important; }
     </style>
     <!-- React, ReactDOM and Babel from unpkg (online). If you prefer to run behind a server, use the build option. -->
     <script
@@ -3118,15 +3140,138 @@
         );
       }
 
-      function App() {
-        const [page, setPage] = useState(
-          window.location.hash === "#/merger" ? "merger" : "prepper",
-        );
+      function ArtHunt() {
+        const CX = '37361ddec8f2b4ecb';
+        const ALLOWED_SIZES = ['any','icon','small','medium','large','xlarge','xxlarge','huge'];
+        const [imgsize, setImgsize] = useState(() => {
+          const p = new URLSearchParams(window.location.search).get('imgsize');
+          return ALLOWED_SIZES.includes(p) ? p : 'any';
+        });
+        const hostRef = useRef(null);
+        const cseLoadedRef = useRef(false);
 
         useEffect(() => {
-          const onHash = () => {
-            setPage(window.location.hash === "#/merger" ? "merger" : "prepper");
-          };
+          if (!hostRef.current) return;
+          const attrs = [
+            'class="gcse-search"',
+            'data-defaultToImageSearch="true"',
+            'data-queryParameterName="q"',
+            'data-autoSearchOnLoad="true"',
+          ];
+          if (imgsize !== 'any') attrs.push(`data-image_size="${imgsize}"`);
+          hostRef.current.innerHTML = `<div ${attrs.join(' ')}></div>`;
+
+          if (!cseLoadedRef.current) {
+            cseLoadedRef.current = true;
+            const s = document.createElement('script');
+            s.async = true;
+            s.src = `https://cse.google.com/cse.js?cx=${CX}`;
+            document.head.appendChild(s);
+          }
+
+        }, []);
+
+        const getCurrentTypedQuery = () => {
+          const input = document.querySelector('input.gsc-input') ||
+            document.querySelector('input.gsc-input-box') ||
+            document.querySelector('input[type="text"]');
+          if (input && input.value && input.value.trim()) return input.value.trim();
+          const q = new URLSearchParams(window.location.search).get('q');
+          return q ? q.trim() : '';
+        };
+
+        const handleSizeChange = (e) => {
+          const newSize = e.target.value;
+          setImgsize(newSize);
+          const p = new URLSearchParams(window.location.search);
+          const q = getCurrentTypedQuery();
+          if (q) p.set('q', q); else p.delete('q');
+          p.set('imgsize', newSize);
+          window.location.href = window.location.pathname + '?' + p.toString() + '#/art-hunt';
+        };
+
+        const sources = [
+          { name: 'MTGNexus', url: 'https://www.mtgnexus.com/gallery/' },
+          { name: 'Magic-Ville', url: 'https://www-magic--ville-com.translate.goog/fr/illustrations?_x_tr_sl=auto&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=wapp' },
+          { name: 'MTGPics', url: 'https://www.mtgpics.com/art' },
+          { name: 'Art of MTG', url: 'https://www.artofmtg.com/' },
+          { name: '"MTG P_rn" (joke name, not actually explicit!)', url: 'https://www.reddit.com/r/mtgporn/' },
+        ];
+
+        return (
+          <div style={{
+            fontFamily: 'Inter, system-ui, sans-serif',
+            background: '#111111',
+            color: '#eeeeee',
+            minHeight: '100vh',
+            padding: '16px',
+          }}>
+            <div style={{ width: 'min(1180px, 100%)', margin: '0 auto' }}>
+              <header style={{ marginBottom: '12px' }}>
+                <h1 style={{ margin: 0, fontSize: 'clamp(2.4rem, 5vw, 4.1rem)', lineHeight: 0.95, fontWeight: 800, letterSpacing: '-0.03em', color: '#eeeeee' }}>
+                  The Hunt for ART
+                </h1>
+                <p style={{ margin: '2px 0 0', fontSize: 'clamp(1.05rem, 2vw, 1.55rem)', fontStyle: 'italic', fontWeight: 400, color: '#94a3b8' }}>
+                  Quickly find MTG artwork for proxy making
+                </p>
+              </header>
+
+              <section style={{ background: 'transparent', border: '1px solid #333', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
+                <h2 style={{ margin: 0, fontSize: 'clamp(1.4rem, 2.3vw, 2rem)', lineHeight: 1.05, fontWeight: 600, color: '#eeeeee' }}>
+                  Browse for inspiration
+                </h2>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginTop: '40px', padding: '0 10px' }}>
+                  {sources.map(s => (
+                    <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        minWidth: '126px', padding: '8px 18px', border: '1px solid #444',
+                        borderRadius: '6px', background: '#1a1a1a',
+                        fontSize: 'clamp(1rem, 1.8vw, 1.15rem)', fontWeight: 600, textAlign: 'center',
+                        color: '#eeeeee', textDecoration: 'none',
+                        transition: 'transform 120ms ease, background 120ms ease',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#252525'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#1a1a1a'; e.currentTarget.style.transform = 'none'; }}
+                    >{s.name}</a>
+                  ))}
+                </div>
+              </section>
+
+              <div style={{ margin: '2px 0 6px 8px', fontSize: '28px', fontWeight: 700, lineHeight: 1, color: '#555555' }}>OR</div>
+
+              <section style={{ background: 'transparent', border: '1px solid #333', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
+                  <h2 style={{ margin: 0, fontSize: 'clamp(1.4rem, 2.3vw, 2rem)', lineHeight: 1.05, fontWeight: 600, color: '#eeeeee' }}>
+                    Hunt for arts of a specific card
+                  </h2>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', fontSize: '0.98rem' }}>
+                    <label htmlFor="imgsize" style={{ fontWeight: 400, color: '#94a3b8' }}>Filter results to images of:</label>
+                    <select id="imgsize" value={imgsize} onChange={handleSizeChange}
+                      style={{ border: '1px solid #444', borderRadius: '6px', background: '#0b0b0b', color: '#eeeeee', padding: '6px 10px', minWidth: '130px', fontFamily: 'inherit' }}>
+                      {ALLOWED_SIZES.map(s => (
+                        <option key={s} value={s}>{s === 'any' ? 'Any size' : s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div ref={hostRef} style={{ border: 'none', minHeight: '400px', background: 'transparent', padding: '10px', overflow: 'hidden' }} />
+              </section>
+            </div>
+          </div>
+        );
+      }
+
+      function App() {
+        const pageFromHash = (h) => {
+          if (h.startsWith('#/merger')) return 'merger';
+          if (h.startsWith('#/art-hunt')) return 'art-hunt';
+          return 'prepper';
+        };
+        const [page, setPage] = useState(() => pageFromHash(window.location.hash));
+
+        useEffect(() => {
+          const onHash = () => setPage(pageFromHash(window.location.hash));
           window.addEventListener("hashchange", onHash);
           return () => window.removeEventListener("hashchange", onHash);
         }, []);
@@ -3135,6 +3280,7 @@
         useEffect(() => {
           const el = document.getElementById("simple-outpaint-prompts");
           if (el) el.style.display = page === "prepper" ? "" : "none";
+          document.body.style.background = "";
         }, [page]);
 
         return (
@@ -3154,11 +3300,20 @@
               >
                 Merger
               </a>
+              <a
+                href="#/art-hunt"
+                onClick={() => setPage("art-hunt")}
+                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "art-hunt" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
+              >
+                Art Hunt
+              </a>
             </nav>
             {page === "prepper" ? (
               <DetailPreserveImageResizer />
-            ) : (
+            ) : page === "merger" ? (
               <ImageMerger />
+            ) : (
+              <ArtHunt />
             )}
           </div>
         );
