@@ -600,50 +600,54 @@
           return () => window.removeEventListener("keydown", onKey);
         }, [imageObj]);
 
-        // Responsive canvas scale calculation
+        // Responsive preview sizing using the actual container width.
+        // This avoids transform-based clipping on mobile browsers.
         useEffect(() => {
           const calculateScale = () => {
-            // Use window width for more reliable calculation
-            const windowWidth = window.innerWidth;
-            const padding = 48; // Account for padding (24px on each side on mobile)
-            const availableWidth = windowWidth - padding;
+            const containerEl = containerRef.current;
+            const viewportWidth = window.innerWidth || 0;
+            const visualViewportWidth = Math.round(
+              window.visualViewport?.width || viewportWidth,
+            );
+            const containerWidth = Math.round(
+              containerEl?.clientWidth || viewportWidth,
+            );
 
-            // Calculate scale to fit canvas width within available space
-            // Canvas is 3520px wide, we want it to fit comfortably
-            let scale = 0.25; // Default desktop scale
+            // Give the preview a little breathing room inside the padded layout.
+            const horizontalGutter = viewportWidth < 640 ? 20 : 8;
+            const availableWidth = Math.max(
+              160,
+              Math.min(containerWidth, visualViewportWidth) - horizontalGutter,
+            );
 
-            if (availableWidth < 400) {
-              // Very small screens (mobile) - scale to fit width with some margin
-              scale = Math.max(
-                0.09,
-                Math.min(0.13, (availableWidth * 0.95) / canvasW),
-              );
-            } else if (availableWidth < 640) {
-              // Small mobile screens
-              scale = Math.max(
-                0.13,
-                Math.min(0.19, (availableWidth * 0.9) / canvasW),
-              );
-            } else if (availableWidth < 768) {
-              // Tablets
-              scale = Math.max(
-                0.16,
-                Math.min(0.22, (availableWidth * 0.85) / canvasW),
-              );
-            } else if (availableWidth < 1024) {
-              // Medium screens
-              scale = 0.22;
-            } else {
-              // Large screens (desktop)
-              scale = 0.25;
-            }
+            // Keep desktop behavior capped at the prior default scale,
+            // but always fit inside the real available width on mobile.
+            const fittedScale = availableWidth / canvasW;
+            const scale = Math.max(0.05, Math.min(0.25, fittedScale));
 
             setCanvasScale(scale);
           };
 
+          const resizeObserver =
+            typeof ResizeObserver !== "undefined" && containerRef.current
+              ? new ResizeObserver(calculateScale)
+              : null;
+          if (resizeObserver && containerRef.current) {
+            resizeObserver.observe(containerRef.current);
+          }
+
           calculateScale();
           window.addEventListener("resize", calculateScale);
-          return () => window.removeEventListener("resize", calculateScale);
+          window.visualViewport?.addEventListener("resize", calculateScale);
+
+          return () => {
+            resizeObserver?.disconnect();
+            window.removeEventListener("resize", calculateScale);
+            window.visualViewport?.removeEventListener(
+              "resize",
+              calculateScale,
+            );
+          };
         }, [canvasW, canvasH]);
 
         const centerHorizontally = () => {
@@ -1086,6 +1090,9 @@
           });
         }, [canvasW, canvasH]);
 
+        const previewDisplayW = Math.max(1, Math.round(canvasW * canvasScale));
+        const previewDisplayH = Math.max(1, Math.round(canvasH * canvasScale));
+
         return (
           <div ref={containerRef} className="p-3 sm:p-4 md:p-6 max-w-full">
             <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center sm:text-left">
@@ -1483,26 +1490,25 @@
             </div>
 
             <div
-              className={`border border-[#333] overflow-hidden -mx-4 sm:mx-0 px-2 sm:px-0 transition-all ${activeInteraction ? "border-blue-500" : ""}`}
+              className={`w-full overflow-x-auto overflow-y-hidden rounded-lg border border-[#333] transition-all ${activeInteraction ? "border-blue-500" : ""}`}
               style={{
-                width: canvasW * canvasScale,
-                height: canvasH * canvasScale,
                 touchAction: imageObj ? "none" : "auto",
               }}
             >
               <div
-                className={`border inline-block transition-all ${activeInteraction ? "border-blue-400" : "border-[#333]"}`}
+                className={`inline-block align-top transition-all ${activeInteraction ? "shadow-[0_0_0_1px_rgba(96,165,250,0.9)]" : ""}`}
                 style={{
-                  width: canvasW,
-                  height: canvasH,
-                  transform: `scale(${canvasScale})`,
-                  transformOrigin: "top left",
+                  width: `${previewDisplayW}px`,
+                  height: `${previewDisplayH}px`,
                 }}
               >
                 <canvas
                   ref={canvasRef}
                   className="block"
                   style={{
+                    width: `${previewDisplayW}px`,
+                    height: `${previewDisplayH}px`,
+                    maxWidth: "none",
                     background: BG_COLOR,
                     touchAction: "none",
                     cursor: dragging
