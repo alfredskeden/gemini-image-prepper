@@ -2119,6 +2119,8 @@
             temp.width = w;
             temp.height = h;
             const tctx = temp.getContext("2d");
+            tctx.imageSmoothingEnabled = true;
+            tctx.imageSmoothingQuality = "high";
 
             tctx.drawImage(
               ogImg,
@@ -2163,6 +2165,8 @@
           const canvas = canvasRef.current;
           if (!canvas) return;
           const ctx = canvas.getContext("2d");
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.fillStyle = "#808080";
           ctx.fillRect(0, 0, canvasW, canvasH);
@@ -2422,6 +2426,8 @@
           final.width = canvasW;
           final.height = canvasH;
           const fctx = final.getContext("2d");
+          fctx.imageSmoothingEnabled = true;
+          fctx.imageSmoothingQuality = "high";
           fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
           if (ogImage && ogState.w > 0) {
             applyFeatheredMask(
@@ -2544,6 +2550,8 @@
           final.width = canvasW;
           final.height = canvasH;
           const fctx = final.getContext("2d");
+          fctx.imageSmoothingEnabled = true;
+          fctx.imageSmoothingQuality = "high";
           fctx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
           final.toBlob((blob) => {
             if (!blob) {
@@ -2605,6 +2613,8 @@
               mergedCanvas.width = canvasW;
               mergedCanvas.height = canvasH;
               const mergedCtx = mergedCanvas.getContext("2d");
+              mergedCtx.imageSmoothingEnabled = true;
+              mergedCtx.imageSmoothingQuality = "high";
               mergedCtx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
               if (ogImage && ogState.w > 0) {
                 applyFeatheredMask(
@@ -2636,6 +2646,8 @@
               outpaintCanvas.width = canvasW;
               outpaintCanvas.height = canvasH;
               const octx = outpaintCanvas.getContext("2d");
+              octx.imageSmoothingEnabled = true;
+              octx.imageSmoothingQuality = "high";
               octx.drawImage(outpaintImage, 0, 0, canvasW, canvasH);
 
               children.push({
