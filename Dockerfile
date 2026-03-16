@@ -1,9 +1,7 @@
 FROM nginx:alpine
 
-# Copy the HTML file to nginx html directory
-COPY "gemini-outpaint-prepper.html" /usr/share/nginx/html/index.html
+COPY gemini-outpaint-prepper.html /usr/share/nginx/html/index.html
+COPY gemini-watermark-remover.html /usr/share/nginx/html/gwr/index.html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 6622
 EXPOSE 6622
-
-# nginx runs automatically when container starts
