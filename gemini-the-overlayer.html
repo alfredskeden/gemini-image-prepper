@@ -1,0 +1,3559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Batch Overlay Composer — Phase 7 UX Polish and Hardening</title>
+  <style>
+    :root {
+      --bg-0: #071018;
+      --bg-1: #0c1723;
+      --panel: rgba(15, 27, 40, 0.88);
+      --panel-2: rgba(19, 35, 52, 0.9);
+      --panel-3: rgba(27, 48, 71, 0.68);
+      --line: rgba(137, 176, 217, 0.2);
+      --line-strong: rgba(137, 176, 217, 0.38);
+      --text: #edf5ff;
+      --muted: #9eb5cb;
+      --soft: #7d95ac;
+      --accent: #6dc4ff;
+      --accent-2: #98f0dd;
+      --accent-3: #b89cff;
+      --danger: #ff879b;
+      --warn: #ffd37b;
+      --ok: #8ae8b0;
+      --shadow: 0 18px 55px rgba(0, 0, 0, 0.33);
+      --radius-xl: 26px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+      --transition: 160ms ease;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(104, 190, 255, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(184, 156, 255, 0.12), transparent 24%),
+        radial-gradient(circle at bottom center, rgba(152, 240, 221, 0.08), transparent 35%),
+        linear-gradient(180deg, #08111a 0%, #0a1420 48%, #071018 100%);
+    }
+
+    body { padding: 24px; }
+
+    .app-shell {
+      max-width: 1480px;
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: linear-gradient(145deg, rgba(15, 29, 43, 0.95), rgba(10, 20, 32, 0.88));
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      padding: 28px 30px;
+      display: grid;
+      gap: 22px;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: -15% auto auto -10%;
+      width: 360px;
+      height: 360px;
+      background: radial-gradient(circle, rgba(109, 196, 255, 0.18), transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -5% -25% auto;
+      width: 420px;
+      height: 420px;
+      background: radial-gradient(circle, rgba(184, 156, 255, 0.12), transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero-top {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .hero-copy {
+      display: grid;
+      gap: 12px;
+      max-width: 860px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(109, 196, 255, 0.08);
+      color: var(--accent);
+      border: 1px solid rgba(109, 196, 255, 0.18);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 3.6vw, 3.35rem);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-copy p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      max-width: 75ch;
+      font-size: 15px;
+    }
+
+    .hero-stats {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(150px, 1fr));
+      gap: 14px;
+      width: min(100%, 520px);
+    }
+    .hero-notice {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .hero-notice::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      margin-top: 5px;
+      background: var(--accent);
+      box-shadow: 0 0 0 8px rgba(109, 196, 255, 0.08);
+    }
+
+    .hero-notice.warn::before { background: var(--warn); box-shadow: 0 0 0 8px rgba(255, 211, 123, 0.08); }
+    .hero-notice.error::before { background: var(--danger); box-shadow: 0 0 0 8px rgba(255, 135, 155, 0.08); }
+    .hero-notice.ok::before { background: var(--ok); box-shadow: 0 0 0 8px rgba(138, 232, 176, 0.08); }
+
+
+    .stat-card {
+      padding: 16px 16px 14px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      min-height: 104px;
+    }
+
+    .stat-label {
+      color: var(--soft);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .stat-sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .sidebar, .content {
+      display: grid;
+      gap: 20px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .panel-title-wrap {
+      display: grid;
+      gap: 6px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+
+    .panel-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    .panel-body {
+      padding: 18px 20px 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel-header .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(152, 240, 221, 0.08);
+      border: 1px solid rgba(152, 240, 221, 0.18);
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .dropzone {
+      position: relative;
+      border: 1.5px dashed var(--line-strong);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
+        rgba(8, 17, 28, 0.56);
+      border-radius: 22px;
+      padding: 20px;
+      display: grid;
+      gap: 14px;
+      min-height: 176px;
+      transition: border-color var(--transition), background var(--transition), transform var(--transition), box-shadow var(--transition);
+    }
+
+    .dropzone.is-active {
+      border-color: rgba(109, 196, 255, 0.8);
+      background:
+        linear-gradient(180deg, rgba(109,196,255,0.08), rgba(109,196,255,0.03)),
+        rgba(8, 17, 28, 0.7);
+      box-shadow: inset 0 0 0 1px rgba(109, 196, 255, 0.18), 0 0 0 4px rgba(109, 196, 255, 0.06);
+      transform: translateY(-1px);
+    }
+
+    .dropzone-title {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .dropzone-copy {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 48ch;
+    }
+
+    .dropzone-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .button,
+    .ghost-button,
+    .segmented button,
+    .icon-button {
+      appearance: none;
+      border: 0;
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+      transition: transform var(--transition), opacity var(--transition), background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(109, 196, 255, 0.18), rgba(109, 196, 255, 0.11));
+      border: 1px solid rgba(109, 196, 255, 0.35);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+      font-weight: 650;
+    }
+
+    .button:hover:not(:disabled),
+    .ghost-button:hover:not(:disabled),
+    .segmented button:hover:not(:disabled),
+    .icon-button:hover:not(:disabled),
+    .source-item-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button:disabled,
+    .ghost-button:disabled,
+    .segmented button:disabled,
+    .icon-button:disabled,
+    input:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .button.secondary {
+      background: linear-gradient(180deg, rgba(152, 240, 221, 0.14), rgba(152, 240, 221, 0.08));
+      border-color: rgba(152, 240, 221, 0.3);
+      color: #e9fff8;
+    }
+
+    .button.danger {
+      background: linear-gradient(180deg, rgba(255, 135, 155, 0.18), rgba(255, 135, 155, 0.1));
+      border-color: rgba(255, 135, 155, 0.34);
+      color: #ffe8ee;
+    }
+
+    .ghost-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .icon-button {
+      min-width: 38px;
+      min-height: 38px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .hint-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--soft);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .hint-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .field input[type="text"] {
+      width: 100%;
+      min-height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(5, 13, 22, 0.68);
+      color: var(--text);
+      font: inherit;
+      padding: 0 14px;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+
+    .field input[type="text"]:focus {
+      border-color: rgba(109, 196, 255, 0.5);
+      box-shadow: 0 0 0 4px rgba(109, 196, 255, 0.08);
+      background: rgba(5, 13, 22, 0.88);
+    }
+
+    .segmented {
+      display: inline-grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      padding: 6px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .segmented button {
+      min-height: 44px;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+      padding: 0 14px;
+      text-align: center;
+      border: 1px solid transparent;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: linear-gradient(180deg, rgba(109, 196, 255, 0.16), rgba(109, 196, 255, 0.1));
+      border-color: rgba(109, 196, 255, 0.28);
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .meta-card {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: grid;
+      gap: 4px;
+    }
+
+    .meta-card .k {
+      color: var(--soft);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+    }
+
+    .meta-card .v {
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .source-list {
+      display: grid;
+      gap: 12px;
+      max-height: 480px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .source-list::-webkit-scrollbar,
+    .log-list::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .source-list::-webkit-scrollbar-thumb,
+    .log-list::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.12);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    .source-item-button {
+      appearance: none;
+      width: 100%;
+      border: 0;
+      text-align: left;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: inherit;
+      cursor: pointer;
+      transition: transform var(--transition), border-color var(--transition), background var(--transition), box-shadow var(--transition);
+    }
+
+    .source-item-button.is-selected {
+      border-color: rgba(109, 196, 255, 0.34);
+      background: linear-gradient(180deg, rgba(109,196,255,0.08), rgba(255,255,255,0.03));
+      box-shadow: inset 0 0 0 1px rgba(109, 196, 255, 0.1);
+    }
+
+    .source-item-button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(109, 196, 255, 0.1);
+      border-color: rgba(109, 196, 255, 0.45);
+    }
+
+    .source-index {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      background: rgba(109, 196, 255, 0.1);
+      border: 1px solid rgba(109, 196, 255, 0.18);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .source-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .source-name {
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .source-sub,
+    .overlay-line,
+    .empty-state,
+    .status-line {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .source-badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .badge.ok {
+      color: #dcfff0;
+      background: rgba(138, 232, 176, 0.08);
+      border-color: rgba(138, 232, 176, 0.18);
+    }
+
+    .badge.warn {
+      color: #fff0ce;
+      background: rgba(255, 211, 123, 0.08);
+      border-color: rgba(255, 211, 123, 0.2);
+    }
+
+    .badge.danger {
+      color: #ffe2e8;
+      background: rgba(255, 135, 155, 0.08);
+      border-color: rgba(255, 135, 155, 0.18);
+    }
+
+    .overlay-preview-shell,
+    .preview-shell {
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: linear-gradient(180deg, rgba(5, 13, 22, 0.82), rgba(12, 22, 34, 0.74));
+      min-height: 220px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .overlay-preview-shell {
+      min-height: 240px;
+      padding: 12px;
+    }
+
+    .overlay-preview-shell img {
+      max-width: 100%;
+      max-height: 216px;
+      object-fit: contain;
+      filter: drop-shadow(0 14px 24px rgba(0,0,0,0.3));
+    }
+
+    .preview-shell {
+      align-items: stretch;
+      justify-items: stretch;
+      padding: 16px;
+      min-height: 520px;
+      background:
+        linear-gradient(180deg, rgba(5, 13, 22, 0.88), rgba(12, 22, 34, 0.84)),
+        linear-gradient(135deg, rgba(109,196,255,0.04), rgba(184,156,255,0.03));
+    }
+
+    .preview-render-shell {
+      position: relative;
+      width: 100%;
+      min-height: 488px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.06);
+      overflow: hidden;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,0.045) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.045) 75%, rgba(255,255,255,0.045)),
+        linear-gradient(45deg, rgba(255,255,255,0.045) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.045) 75%, rgba(255,255,255,0.045));
+      background-position: 0 0, 16px 16px;
+      background-size: 32px 32px;
+      background-color: rgba(10, 19, 30, 0.88);
+    }
+
+    .preview-render-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top left, rgba(109,196,255,0.08), transparent 28%);
+      pointer-events: none;
+    }
+
+    .preview-canvas {
+      position: relative;
+      z-index: 1;
+      display: block;
+      max-width: 100%;
+      max-height: 456px;
+      width: auto;
+      height: auto;
+      border-radius: 16px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.34);
+      background: transparent;
+    }
+
+    .preview-canvas[hidden] {
+      display: none;
+    }
+
+    .preview-overlay-note {
+      position: absolute;
+      inset: 16px auto auto 16px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(109, 196, 255, 0.08);
+      border: 1px solid rgba(109, 196, 255, 0.18);
+      backdrop-filter: blur(8px);
+    }
+
+    .preview-state {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 12px;
+      justify-items: center;
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      max-width: 58ch;
+    }
+
+    .preview-state .icon {
+      width: 74px;
+      height: 74px;
+      border-radius: 24px;
+      border: 1px solid rgba(109, 196, 255, 0.2);
+      background: linear-gradient(180deg, rgba(109, 196, 255, 0.08), rgba(109, 196, 255, 0.03));
+      display: grid;
+      place-items: center;
+      font-size: 30px;
+    }
+
+    .preview-state strong {
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .action-card {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      min-height: 124px;
+    }
+
+    .action-card h4 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .action-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .button-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .progress-wrap {
+      display: grid;
+      gap: 14px;
+    }
+
+    .progress-bar-shell {
+      height: 16px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(109,196,255,0.7), rgba(152,240,221,0.8));
+      transition: width 220ms ease;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .log-list {
+      display: grid;
+      gap: 10px;
+      max-height: 220px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .log-entry {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: grid;
+      gap: 4px;
+    }
+
+    .log-entry .time {
+      color: var(--soft);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .log-entry .text {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      background: var(--soft);
+      box-shadow: 0 0 0 6px rgba(255,255,255,0.03);
+      margin-right: 8px;
+      transform: translateY(1px);
+    }
+
+    .status-dot.ready { background: var(--ok); }
+    .status-dot.waiting { background: var(--warn); }
+    .status-dot.error { background: var(--danger); }
+    .status-dot.processing { background: var(--accent); }
+
+    .dropzone.is-disabled {
+      opacity: 0.55;
+      filter: saturate(0.7);
+      cursor: not-allowed;
+    }
+
+    .inline-note {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .inline-note.warn {
+      border-color: rgba(255, 211, 123, 0.2);
+      background: rgba(255, 211, 123, 0.08);
+      color: #fff0ce;
+    }
+
+    .inline-note.error {
+      border-color: rgba(255, 135, 155, 0.2);
+      background: rgba(255, 135, 155, 0.08);
+      color: #ffe2e8;
+    }
+
+    .drag-curtain {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(5, 11, 18, 0.56);
+      backdrop-filter: blur(10px);
+    }
+
+    .drag-curtain-card {
+      min-width: min(560px, 92vw);
+      padding: 22px 24px;
+      border-radius: 24px;
+      border: 1px solid rgba(109, 196, 255, 0.22);
+      background: linear-gradient(180deg, rgba(17, 31, 45, 0.96), rgba(11, 21, 34, 0.94));
+      box-shadow: 0 20px 60px rgba(0,0,0,0.38);
+      text-align: center;
+      display: grid;
+      gap: 10px;
+    }
+
+    .drag-curtain-card strong {
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+
+
+    .footer-note {
+      color: var(--soft);
+      text-align: center;
+      font-size: 12px;
+      padding: 2px 8px 10px;
+    }
+
+    .hidden-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    @media (max-width: 1180px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .hero-stats { width: 100%; }
+    }
+
+    @media (max-width: 820px) {
+      body { padding: 16px; }
+
+      .hero,
+      .panel { border-radius: 22px; }
+
+      .hero { padding: 22px; }
+
+      .input-grid,
+      .status-grid,
+      .action-row,
+      .meta-grid,
+      .hero-stats { grid-template-columns: 1fr; }
+
+      .source-item-button { grid-template-columns: auto 1fr; }
+
+      .source-badges {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+      }
+
+      .preview-shell { min-height: 440px; }
+      .preview-render-shell { min-height: 380px; }
+      .preview-canvas { max-height: 340px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <section class="hero" aria-label="Application overview">
+      <div class="hero-top">
+        <div class="hero-copy">
+          <div class="eyebrow">Batch overlay composer</div>
+          <h1>Batch-process images with a single transparent overlay.</h1>
+        </div>
+        <div class="hero-stats" aria-label="Current session summary">
+          <div class="stat-card">
+            <div class="stat-label">Source images</div>
+            <div class="stat-value" id="statSourceCount">0</div>
+            <div class="stat-sub">Mixed dimensions supported. No size gate.</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Overlay</div>
+            <div class="stat-value" id="statOverlayState">Missing</div>
+            <div class="stat-sub">Overlay must be a PNG with transparency support.</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Preview stage</div>
+            <div class="stat-value" id="statPreviewState">Idle</div>
+            <div class="stat-sub">Real compositor on main thread.</div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-notice" id="sessionNotice" hidden></div>
+    </section>
+
+    <div class="main-grid">
+      <aside class="sidebar">
+        <section class="panel" aria-labelledby="sourcesHeading">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2 class="panel-title" id="sourcesHeading">Source images</h2>
+              <p class="panel-subtitle">Import many source images in one action. Click a source to choose which image is used for the live preview.</p>
+            </div>
+            <div class="pill" id="sourceCountPill">0 files</div>
+          </div>
+          <div class="panel-body">
+            <div class="dropzone" id="sourceDropzone" tabindex="0" role="button" aria-describedby="sourceDropHint">
+              <div>
+                <h3 class="dropzone-title">Drop source images here</h3>
+                <p class="dropzone-copy" id="sourceDropHint">
+                  Accepts browser-decodable image files. Batch import is supported. Images are not rejected for large or unusual dimensions.
+                </p>
+              </div>
+              <div class="dropzone-actions">
+                <button class="button" id="pickSourcesButton" type="button">Choose source images</button>
+                <button class="ghost-button" id="removeSelectedSourceButton" type="button">Remove selected</button>
+                <button class="ghost-button" id="clearSourcesButton" type="button">Clear sources</button>
+              </div>
+              <div class="hint-row">
+                <div class="hint-chip">Any image dimensions allowed</div>
+                <div class="hint-chip">Metadata extracted locally</div>
+                <div class="hint-chip">Click a row to preview it</div>
+              </div>
+              <input class="hidden-input" id="sourceInput" type="file" accept="image/*" multiple />
+            </div>
+
+            <div class="inline-note">
+              Sources may be JPEG, PNG, WebP, GIF, BMP, AVIF, or other browser-supported input formats. The eventual export format will still be PNG only.
+            </div>
+
+            <div class="meta-grid" id="sourceInsightGrid">
+              <div class="meta-card">
+                <div class="k">Total source pixels</div>
+                <div class="v" id="sourceMetaPixels">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Input bytes</div>
+                <div class="v" id="sourceMetaBytes">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Estimated decoded RGBA</div>
+                <div class="v" id="sourceMetaMemory">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Largest source</div>
+                <div class="v" id="sourceMetaLargest">—</div>
+              </div>
+            </div>
+
+            <div class="inline-note" id="sourceAdvisoryNote">
+              Imported source diagnostics will appear here after files are loaded.
+            </div>
+
+            <div class="source-list" id="sourceList" aria-live="polite">
+              <div class="empty-state">No source images loaded yet.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="overlayHeading">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2 class="panel-title" id="overlayHeading">Overlay image</h2>
+              <p class="panel-subtitle">Exactly one overlay file. PNG only. Transparency is allowed and expected.</p>
+            </div>
+            <div class="pill" id="overlayPill">PNG</div>
+          </div>
+          <div class="panel-body">
+            <div class="dropzone" id="overlayDropzone" tabindex="0" role="button" aria-describedby="overlayDropHint">
+              <div>
+                <h3 class="dropzone-title">Drop overlay PNG here</h3>
+                <p class="dropzone-copy" id="overlayDropHint">
+                  Only PNG is accepted for the overlay. The selected overlay is reused across the entire batch.
+                </p>
+              </div>
+              <div class="dropzone-actions">
+                <button class="button secondary" id="pickOverlayButton" type="button">Choose overlay PNG</button>
+                <button class="ghost-button" id="clearOverlayButton" type="button">Clear overlay</button>
+              </div>
+              <div class="hint-row">
+                <div class="hint-chip">Overlay input must be PNG</div>
+                <div class="hint-chip">Single overlay for all sources</div>
+                <div class="hint-chip">Validation happens locally</div>
+              </div>
+              <input class="hidden-input" id="overlayInput" type="file" accept="image/png,.png" />
+            </div>
+
+            <div class="overlay-preview-shell" id="overlayPreviewShell" aria-live="polite">
+              <div class="preview-state" id="overlayPlaceholder">
+                <div class="icon">◇</div>
+                <div>
+                  <strong>Overlay preview placeholder</strong>
+                  <div class="status-line">The selected PNG will appear here after import.</div>
+                </div>
+              </div>
+              <img id="overlayPreviewImage" alt="Overlay preview" hidden />
+            </div>
+
+            <div class="meta-grid" id="overlayMetaGrid">
+              <div class="meta-card">
+                <div class="k">Filename</div>
+                <div class="v" id="overlayMetaName">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Dimensions</div>
+                <div class="v" id="overlayMetaDimensions">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">File size</div>
+                <div class="v" id="overlayMetaSize">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Type</div>
+                <div class="v" id="overlayMetaType">—</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="content">
+        <section class="panel" aria-labelledby="controlsHeading">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+            </div>
+            <button class="ghost-button" id="resetAllButton" type="button">Reset all</button>
+          </div>
+          <div class="panel-body">
+            <div class="field">
+              <label>Overlay behavior</label>
+              <div class="segmented" id="overlayModeGroup" role="group" aria-label="Overlay behavior">
+                <button type="button" data-overlay-mode="center" aria-pressed="true">Unscaled + centered</button>
+                <button type="button" data-overlay-mode="stretch" aria-pressed="false">Stretch to fit image</button>
+              </div>
+              <div class="status-line" id="overlayModeDescription">
+                Overlay remains at its original pixel dimensions and is centered horizontally and vertically over each source image.
+              </div>
+            </div>
+
+            <div class="input-grid">
+              <div class="field">
+                <label for="outputSuffixInput">Output suffix</label>
+                <input id="outputSuffixInput" type="text" value="_overlay" spellcheck="false" />
+              </div>
+              <div class="field">
+                <label for="zipNameInput">ZIP filename</label>
+                <input id="zipNameInput" type="text" value="batch-overlay-output" spellcheck="false" />
+              </div>
+            </div>
+
+            <div class="meta-grid">
+              <div class="meta-card">
+                <div class="k">Export format</div>
+                <div class="v">PNG only</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Archive format</div>
+                <div class="v">ZIP only</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Compression policy</div>
+                <div class="v">No lossy output anywhere</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Canvas sizing rule</div>
+                <div class="v">Preview targets source dimensions when browser limits allow</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="previewHeading">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2 class="panel-title" id="previewHeading">Preview compositor</h2>
+              <p class="panel-subtitle">The selected source image is composited with the overlay on the main thread. This is a real render, not a mockup.</p>
+            </div>
+            <div class="pill" id="previewPill">Idle</div>
+          </div>
+          <div class="panel-body">
+            <div class="preview-shell" aria-live="polite">
+              <div class="preview-render-shell">
+                <div class="preview-overlay-note" id="previewOverlayLabel">Unscaled + centered</div>
+                <canvas class="preview-canvas" id="previewCanvas" hidden></canvas>
+                <div class="preview-state" id="previewState">
+                  <div class="icon">▣</div>
+                  <div>
+                    <strong>Preview waiting for inputs</strong>
+                    <div class="status-line" id="previewStateText">Load at least one source image and one overlay PNG to render the first real composite.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="meta-grid">
+              <div class="meta-card">
+                <div class="k">Selected source</div>
+                <div class="v" id="previewMetaSource">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Output dimensions</div>
+                <div class="v" id="previewMetaOutput">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Preview canvas</div>
+                <div class="v" id="previewMetaCanvas">—</div>
+              </div>
+              <div class="meta-card">
+                <div class="k">Overlay mode</div>
+                <div class="v" id="previewMetaMode">—</div>
+              </div>
+            </div>
+
+            <div class="inline-note" id="previewStatusNote">
+              Load at least one source image and one overlay PNG. The preview will then render automatically. You can also click a source entry to switch the preview target.
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="actionsHeading">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2 class="panel-title" id="actionsHeading">Actions</h2>
+              <p class="panel-subtitle">Preview is real. Batch processing uses a bounded worker queue with cancel support. ZIP export is live, and this polish pass adds safer destructive actions, improved drag-and-drop, and clearer batch diagnostics.</p>
+            </div>
+            <div class="pill">Phase 7</div>
+          </div>
+          <div class="panel-body">
+            <div class="action-row">
+              <div class="action-card">
+                <h4>Refresh preview</h4>
+                <p>Reruns the main-thread preview compositor using the currently selected source image, overlay, and mode.</p>
+                <button class="button" id="previewButton" type="button">Refresh preview</button>
+              </div>
+              <div class="action-card">
+                <h4>Process batch to PNGs</h4>
+                <p>Runs real PNG compositing through a bounded queue. Worker mode keeps the UI more responsive, and cancellation can stop queued work cleanly.</p>
+                <div class="button-stack">
+                  <button class="button secondary" id="batchButton" type="button">Process batch to PNGs</button>
+                  <button class="button danger" id="cancelBatchButton" type="button">Cancel batch</button>
+                </div>
+              </div>
+              <div class="action-card">
+                <h4>Build ZIP</h4>
+                <p>Packages the currently prepared PNG outputs into a real ZIP archive and starts a download. You can also re-trigger the most recent ZIP download without rebuilding it if the archive is still current in memory.</p>
+                <div class="button-stack">
+                  <button class="ghost-button" id="zipButton" type="button">Build ZIP</button>
+                  <button class="ghost-button" id="redownloadZipButton" type="button">Download last ZIP again</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="progressHeading">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2 class="panel-title" id="progressHeading">Progress and diagnostics</h2>
+              <p class="panel-subtitle">This section tracks readiness, bounded-queue activity, cancellation state, processed-output state, large-batch diagnostics, and validation messages.</p>
+            </div>
+            <button class="ghost-button" id="clearLogButton" type="button">Clear log</button>
+          </div>
+          <div class="panel-body">
+            <div class="progress-wrap">
+              <div class="progress-bar-shell" aria-hidden="true">
+                <div class="progress-bar" id="progressBar"></div>
+              </div>
+              <div class="status-grid">
+                <div class="meta-card">
+                  <div class="k">Session readiness</div>
+                  <div class="v" id="sessionReadiness"><span class="status-dot waiting"></span>Waiting for inputs</div>
+                </div>
+                <div class="meta-card">
+                  <div class="k">Last event</div>
+                  <div class="v" id="lastEvent">App initialized</div>
+                </div>
+                <div class="meta-card">
+                  <div class="k">Batch state</div>
+                  <div class="v" id="batchState">No processed PNG outputs yet</div>
+                </div>
+                <div class="meta-card">
+                  <div class="k">Queue</div>
+                  <div class="v" id="batchQueue">0 active · 0 queued</div>
+                </div>
+                <div class="meta-card">
+                  <div class="k">Engine</div>
+                  <div class="v" id="batchEngine">—</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="log-list" id="logList" aria-live="polite"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="footer-note">
+      Single-file local build. No network upload. Preview compositor, bounded worker PNG batching, cancel support, and ZIP export are live. This offline build embeds its own ZIP assembly logic, so the app can run entirely without a network connection.
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const PREVIEW_LIMITS = {
+        maxSide: 8192,
+        maxPixels: 24000000,
+      };
+
+      const WORKER_TASK_TIMEOUT = 120000;
+
+      const state = {
+        sources: [],
+        overlay: null,
+        settings: {
+          overlayMode: 'center',
+          outputSuffix: '_overlay',
+          zipName: 'batch-overlay-output',
+        },
+        preview: {
+          selectedSourceKey: null,
+          status: 'idle',
+          message: 'Waiting for inputs',
+          requestId: 0,
+          renderedSourceName: null,
+          outputWidth: null,
+          outputHeight: null,
+          canvasWidth: null,
+          canvasHeight: null,
+          usedProxyScale: false,
+        },
+        batch: {
+          status: 'idle',
+          totalCount: 0,
+          completedCount: 0,
+          failedCount: 0,
+          activeCount: 0,
+          queuedCount: 0,
+          concurrency: 1,
+          cancelRequested: false,
+          activeSourceKeys: [],
+          activeSourceNames: [],
+          results: [],
+          engineMode: null,
+          lastEngine: null,
+          message: 'No processed PNG outputs in memory yet.',
+          runId: 0,
+        },
+        zip: {
+          status: 'idle',
+          totalEntries: 0,
+          completedEntries: 0,
+          currentEntryName: null,
+          currentArchiveName: null,
+          lastArchiveName: null,
+          lastArchiveSize: 0,
+          lastArchiveBlob: null,
+          error: null,
+        },
+        ui: {
+          logEntries: [],
+          lastEvent: 'App initialized',
+        },
+      };
+
+      const dom = {
+        sourceInput: document.getElementById('sourceInput'),
+        overlayInput: document.getElementById('overlayInput'),
+        pickSourcesButton: document.getElementById('pickSourcesButton'),
+        clearSourcesButton: document.getElementById('clearSourcesButton'),
+        removeSelectedSourceButton: document.getElementById('removeSelectedSourceButton'),
+        pickOverlayButton: document.getElementById('pickOverlayButton'),
+        clearOverlayButton: document.getElementById('clearOverlayButton'),
+        resetAllButton: document.getElementById('resetAllButton'),
+        clearLogButton: document.getElementById('clearLogButton'),
+        sourceDropzone: document.getElementById('sourceDropzone'),
+        overlayDropzone: document.getElementById('overlayDropzone'),
+        sourceList: document.getElementById('sourceList'),
+        sourceCountPill: document.getElementById('sourceCountPill'),
+        sourceMetaPixels: document.getElementById('sourceMetaPixels'),
+        sourceMetaBytes: document.getElementById('sourceMetaBytes'),
+        sourceMetaMemory: document.getElementById('sourceMetaMemory'),
+        sourceMetaLargest: document.getElementById('sourceMetaLargest'),
+        sourceAdvisoryNote: document.getElementById('sourceAdvisoryNote'),
+        sessionNotice: document.getElementById('sessionNotice'),
+        dragCurtain: document.getElementById('dragCurtain'),
+        statSourceCount: document.getElementById('statSourceCount'),
+        statOverlayState: document.getElementById('statOverlayState'),
+        statPreviewState: document.getElementById('statPreviewState'),
+        overlayPill: document.getElementById('overlayPill'),
+        overlayMetaName: document.getElementById('overlayMetaName'),
+        overlayMetaDimensions: document.getElementById('overlayMetaDimensions'),
+        overlayMetaSize: document.getElementById('overlayMetaSize'),
+        overlayMetaType: document.getElementById('overlayMetaType'),
+        overlayPreviewImage: document.getElementById('overlayPreviewImage'),
+        overlayPlaceholder: document.getElementById('overlayPlaceholder'),
+        overlayModeGroup: document.getElementById('overlayModeGroup'),
+        overlayModeDescription: document.getElementById('overlayModeDescription'),
+        outputSuffixInput: document.getElementById('outputSuffixInput'),
+        zipNameInput: document.getElementById('zipNameInput'),
+        previewCanvas: document.getElementById('previewCanvas'),
+        previewState: document.getElementById('previewState'),
+        previewStateText: document.getElementById('previewStateText'),
+        previewOverlayLabel: document.getElementById('previewOverlayLabel'),
+        previewMetaSource: document.getElementById('previewMetaSource'),
+        previewMetaOutput: document.getElementById('previewMetaOutput'),
+        previewMetaCanvas: document.getElementById('previewMetaCanvas'),
+        previewMetaMode: document.getElementById('previewMetaMode'),
+        previewPill: document.getElementById('previewPill'),
+        previewStatusNote: document.getElementById('previewStatusNote'),
+        previewButton: document.getElementById('previewButton'),
+        batchButton: document.getElementById('batchButton'),
+        cancelBatchButton: document.getElementById('cancelBatchButton'),
+        zipButton: document.getElementById('zipButton'),
+        redownloadZipButton: document.getElementById('redownloadZipButton'),
+        progressBar: document.getElementById('progressBar'),
+        sessionReadiness: document.getElementById('sessionReadiness'),
+        lastEvent: document.getElementById('lastEvent'),
+        batchState: document.getElementById('batchState'),
+        batchQueue: document.getElementById('batchQueue'),
+        batchEngine: document.getElementById('batchEngine'),
+        logList: document.getElementById('logList'),
+      };
+
+      const BATCH_CANCELLED_MESSAGE = 'Batch processing cancelled.';
+      const MAX_WORKER_CONCURRENCY = 3;
+
+      const batchRuntime = {
+        workerUrl: null,
+        workerHandles: [],
+      };
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const value = bytes / (1024 ** index);
+        return `${value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
+      }
+
+      function formatDimensions(width, height) {
+        if (!Number.isFinite(width) || !Number.isFinite(height)) return '—';
+        return `${width} × ${height} px`;
+      }
+
+      function formatPixelCount(value) {
+        if (!Number.isFinite(value) || value <= 0) return '0 px';
+        if (value >= 1000000000) return `${(value / 1000000000).toFixed(2)} Gpx`;
+        if (value >= 1000000) return `${(value / 1000000).toFixed(2)} Mpx`;
+        if (value >= 1000) return `${(value / 1000).toFixed(1)} Kpx`;
+        return `${Math.round(value)} px`;
+      }
+
+      function formatCount(value, noun) {
+        return `${value} ${noun}${value === 1 ? '' : 's'}`;
+      }
+
+      function formatApproxBytes(bytes) {
+        return `≈ ${formatBytes(bytes)}`;
+      }
+
+      function looksLikeImageFile(file) {
+        if (!file) return false;
+        if (typeof file.type === 'string' && file.type.startsWith('image/')) return true;
+        return /\.(png|apng|jpe?g|jfif|pjpeg|pjp|webp|gif|bmp|dib|avif|svg|tiff?)$/i.test(file.name || '');
+      }
+
+      function getSourceStats() {
+        const count = state.sources.length;
+        let totalBytes = 0;
+        let totalPixels = 0;
+        let largest = null;
+        for (const item of state.sources) {
+          totalBytes += item.file.size || 0;
+          const pixels = (item.width || 0) * (item.height || 0);
+          totalPixels += pixels;
+          if (!largest || pixels > ((largest.width || 0) * (largest.height || 0))) {
+            largest = item;
+          }
+        }
+        return {
+          count,
+          totalBytes,
+          totalPixels,
+          estimatedRawBytes: totalPixels * 4,
+          largest,
+        };
+      }
+
+      function getSessionNoticeModel() {
+        const stats = getSourceStats();
+        if (!zipLibraryReady()) {
+          return {
+            level: 'error',
+            text: 'This build uses an embedded ZIP writer, so preview, PNG processing, and ZIP export all work offline with no external script dependency.'
+          };
+        }
+        if (stats.estimatedRawBytes >= 1.5 * 1024 * 1024 * 1024) {
+          return {
+            level: 'error',
+            text: `Large-batch advisory: the currently loaded sources represent about ${formatApproxBytes(stats.estimatedRawBytes)} of decoded RGBA image data before overlay compositing. Processing can still work, but expect higher memory pressure and longer ZIP assembly times.`
+          };
+        }
+        if (stats.estimatedRawBytes >= 512 * 1024 * 1024) {
+          return {
+            level: 'warn',
+            text: `Large-batch advisory: the currently loaded sources represent about ${formatApproxBytes(stats.estimatedRawBytes)} of decoded RGBA image data. The app will still try to process them, but batch runs may take noticeably longer.`
+          };
+        }
+        if (state.zip.status === 'ready' && state.zip.lastArchiveName) {
+          return {
+            level: 'ok',
+            text: `ZIP export completed successfully. "${state.zip.lastArchiveName}" remains available for immediate re-download in this session unless you change the sources, overlay, or overlay mode.`
+          };
+        }
+        if (hasBatchResults()) {
+          return {
+            level: 'ok',
+            text: `${formatCount(state.batch.results.length, 'processed PNG output')} ${state.batch.results.length === 1 ? 'is' : 'are'} currently ready in memory. You can build a ZIP immediately without reprocessing.`
+          };
+        }
+        if (stats.count > 0 && state.overlay) {
+          return {
+            level: 'ok',
+            text: `${formatCount(stats.count, 'source image')} ${stats.count === 1 ? 'is' : 'are'} loaded together with a valid overlay PNG. Preview, batch processing, and ZIP preparation are all ready.`
+          };
+        }
+        return null;
+      }
+
+      function isProbablyPng(file) {
+        const name = file?.name?.toLowerCase?.() || '';
+        return file?.type === 'image/png' || name.endsWith('.png');
+      }
+
+      function fileKey(file) {
+        return [file.name, file.size, file.lastModified, file.type].join('::');
+      }
+
+      function makeOutputFilename(sourceName, suffix) {
+        const cleanSuffix = String(suffix ?? '');
+        const lastDot = sourceName.lastIndexOf('.');
+        const baseName = lastDot > 0 ? sourceName.slice(0, lastDot) : sourceName;
+        return `${baseName}${cleanSuffix}.png`;
+      }
+
+      function loadImageFromObjectUrl(src) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error('Image decode failed.'));
+          img.src = src;
+        });
+      }
+
+      async function readImageMetadata(file) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          const image = await loadImageFromObjectUrl(objectUrl);
+          return { width: image.naturalWidth, height: image.naturalHeight };
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }
+
+      async function decodeRenderable(file) {
+        if ('createImageBitmap' in window) {
+          return createImageBitmap(file);
+        }
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          return await loadImageFromObjectUrl(objectUrl);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }
+
+      function releaseRenderable(drawable) {
+        if (drawable && typeof drawable.close === 'function') {
+          try { drawable.close(); } catch (_) { }
+        }
+      }
+
+      function getPreviewRenderPlan(sourceWidth, sourceHeight) {
+        let scale = 1;
+
+        if (sourceWidth > PREVIEW_LIMITS.maxSide || sourceHeight > PREVIEW_LIMITS.maxSide) {
+          scale = Math.min(scale, PREVIEW_LIMITS.maxSide / sourceWidth, PREVIEW_LIMITS.maxSide / sourceHeight);
+        }
+
+        const pixelCount = sourceWidth * sourceHeight;
+        if (pixelCount > PREVIEW_LIMITS.maxPixels) {
+          scale = Math.min(scale, Math.sqrt(PREVIEW_LIMITS.maxPixels / pixelCount));
+        }
+
+        if (!Number.isFinite(scale) || scale <= 0) {
+          scale = 1;
+        }
+
+        const renderWidth = Math.max(1, Math.round(sourceWidth * scale));
+        const renderHeight = Math.max(1, Math.round(sourceHeight * scale));
+        return {
+          sourceWidth,
+          sourceHeight,
+          renderWidth,
+          renderHeight,
+          scale,
+          usesProxyScale: scale < 0.999999,
+        };
+      }
+
+      function hasReadyInputs() {
+        return state.sources.length > 0 && Boolean(state.overlay);
+      }
+
+      function isBatchProcessing() {
+        return state.batch.status === 'processing';
+      }
+
+      function hasBatchResults() {
+        return state.batch.results.length > 0;
+      }
+
+      function isZipBuilding() {
+        return state.zip.status === 'building';
+      }
+
+      function resetZipState(options = {}) {
+        const { preserveLastArchive = false } = options;
+        state.zip.status = 'idle';
+        state.zip.totalEntries = 0;
+        state.zip.completedEntries = 0;
+        state.zip.currentEntryName = null;
+        state.zip.currentArchiveName = null;
+        state.zip.error = null;
+        if (!preserveLastArchive) {
+          state.zip.lastArchiveName = null;
+          state.zip.lastArchiveSize = 0;
+          state.zip.lastArchiveBlob = null;
+        }
+      }
+
+      function resetBatchState() {
+        destroyBatchWorkers();
+        state.batch.status = 'idle';
+        state.batch.totalCount = 0;
+        state.batch.completedCount = 0;
+        state.batch.failedCount = 0;
+        state.batch.activeCount = 0;
+        state.batch.queuedCount = 0;
+        state.batch.concurrency = 1;
+        state.batch.cancelRequested = false;
+        state.batch.activeSourceKeys = [];
+        state.batch.activeSourceNames = [];
+        state.batch.results = [];
+        state.batch.engineMode = null;
+        state.batch.lastEngine = null;
+        state.batch.message = 'No processed PNG outputs in memory yet.';
+      }
+
+      function invalidateBatchResults(logMessage = '') {
+        const hadResults = hasBatchResults();
+        const hadRunState = ['ready', 'error', 'cancelled'].includes(state.batch.status);
+        resetBatchState();
+        resetZipState();
+        if ((hadResults || hadRunState) && logMessage) {
+          addLog(logMessage);
+        }
+      }
+
+      function refreshBatchResultNames() {
+        state.batch.results = state.batch.results.map((result) => ({
+          ...result,
+          outputName: makeOutputFilename(result.sourceName, state.settings.outputSuffix),
+        }));
+      }
+
+      function getBatchResultForKey(sourceKey) {
+        return state.batch.results.find((item) => item.sourceKey === sourceKey) || null;
+      }
+
+      function addLog(message) {
+        const entry = {
+          id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          message,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        };
+        state.ui.logEntries.unshift(entry);
+        state.ui.logEntries = state.ui.logEntries.slice(0, 80);
+        state.ui.lastEvent = message;
+        renderLog();
+        renderProgress();
+      }
+
+      function confirmDestructiveAction(message) {
+        try {
+          return window.confirm(message);
+        } catch (_) {
+          return true;
+        }
+      }
+
+      function resetPreviewToWaiting(message = 'Load at least one source image and one overlay PNG to render the first real composite.') {
+        state.preview.status = 'idle';
+        state.preview.message = message;
+        state.preview.canvasWidth = null;
+        state.preview.canvasHeight = null;
+        state.preview.outputWidth = null;
+        state.preview.outputHeight = null;
+        state.preview.usedProxyScale = false;
+        state.preview.renderedSourceName = null;
+      }
+
+      function renderSessionNotice() {
+        const notice = getSessionNoticeModel();
+        if (!notice) {
+          dom.sessionNotice.hidden = true;
+          dom.sessionNotice.textContent = '';
+          dom.sessionNotice.className = 'hero-notice';
+          return;
+        }
+        dom.sessionNotice.hidden = false;
+        dom.sessionNotice.textContent = notice.text;
+        dom.sessionNotice.className = `hero-notice ${notice.level}`;
+      }
+
+      function renderSourceInsights() {
+        const stats = getSourceStats();
+        if (stats.count === 0) {
+          dom.sourceMetaPixels.textContent = '—';
+          dom.sourceMetaBytes.textContent = '—';
+          dom.sourceMetaMemory.textContent = '—';
+          dom.sourceMetaLargest.textContent = '—';
+          dom.sourceAdvisoryNote.textContent = 'Imported source diagnostics will appear here after files are loaded.';
+          dom.sourceAdvisoryNote.className = 'inline-note';
+          return;
+        }
+
+        dom.sourceMetaPixels.textContent = formatPixelCount(stats.totalPixels);
+        dom.sourceMetaBytes.textContent = formatBytes(stats.totalBytes);
+        dom.sourceMetaMemory.textContent = formatApproxBytes(stats.estimatedRawBytes);
+        dom.sourceMetaLargest.textContent = stats.largest
+          ? `${stats.largest.file.name} · ${formatDimensions(stats.largest.width, stats.largest.height)}`
+          : '—';
+
+        if (stats.estimatedRawBytes >= 1.5 * 1024 * 1024 * 1024) {
+          dom.sourceAdvisoryNote.textContent = 'This is a very large imported image set. Preview is still supported, but batch processing and ZIP assembly may need substantial memory and time.';
+          dom.sourceAdvisoryNote.className = 'inline-note error';
+        } else if (stats.estimatedRawBytes >= 512 * 1024 * 1024 * 1024) {
+          dom.sourceAdvisoryNote.textContent = 'This is a moderately large imported image set. The queue stays bounded, but longer runs and larger in-memory PNG totals should be expected.';
+          dom.sourceAdvisoryNote.className = 'inline-note warn';
+        } else {
+          dom.sourceAdvisoryNote.textContent = 'These figures are local-session estimates. Decoded RGBA memory is approximate and mainly useful as a rough large-batch warning.';
+          dom.sourceAdvisoryNote.className = 'inline-note';
+        }
+      }
+
+      function getSessionReadiness() {
+        if (isZipBuilding()) {
+          const percent = state.zip.totalEntries > 0
+            ? Math.max(6, Math.min(99, Math.round((state.zip.completedEntries / state.zip.totalEntries) * 100)))
+            : 8;
+          return {
+            label: `Building ZIP ${state.zip.completedEntries} / ${state.zip.totalEntries}`,
+            className: 'processing',
+            percent,
+          };
+        }
+
+        if (isBatchProcessing()) {
+          const percent = state.batch.totalCount > 0
+            ? Math.max(6, Math.min(99, Math.round((state.batch.completedCount / state.batch.totalCount) * 100)))
+            : 8;
+          return {
+            label: state.batch.cancelRequested ? 'Cancelling batch' : `Processing ${state.batch.completedCount} / ${state.batch.totalCount}`,
+            className: 'processing',
+            percent,
+          };
+        }
+
+        if (state.zip.status === 'ready' && state.zip.lastArchiveName) {
+          return {
+            label: `ZIP downloaded: ${state.zip.lastArchiveName}`,
+            className: 'ready',
+            percent: 100,
+          };
+        }
+
+        if (state.zip.status === 'error') {
+          return { label: 'ZIP build failed', className: 'error', percent: 100 };
+        }
+
+        if (state.batch.status === 'cancelled') {
+          return {
+            label: 'Batch cancelled',
+            className: 'error',
+            percent: state.batch.totalCount > 0 ? Math.max(10, Math.round((state.batch.completedCount / state.batch.totalCount) * 100)) : 10,
+          };
+        }
+
+        if (state.batch.status === 'error') {
+          return { label: 'Batch failed', className: 'error', percent: 100 };
+        }
+
+        if (hasBatchResults()) {
+          return {
+            label: `${state.batch.results.length} PNG output${state.batch.results.length === 1 ? '' : 's'} ready`,
+            className: 'ready',
+            percent: 100,
+          };
+        }
+
+        const hasSources = state.sources.length > 0;
+        const hasOverlay = Boolean(state.overlay);
+        const previewReady = state.preview.status === 'ready';
+
+        if (hasSources && hasOverlay && previewReady) {
+          return { label: 'Preview ready', className: 'ready', percent: 100 };
+        }
+        if (hasSources && hasOverlay) {
+          return { label: 'Inputs loaded', className: 'ready', percent: 86 };
+        }
+        if (hasSources || hasOverlay) {
+          return { label: 'Partially configured', className: 'waiting', percent: 50 };
+        }
+        return { label: 'Waiting for inputs', className: 'waiting', percent: 10 };
+      }
+
+      function ensureValidPreviewSelection() {
+        if (state.sources.length === 0) {
+          state.preview.selectedSourceKey = null;
+          return;
+        }
+
+        const availableKeys = new Set(state.sources.map((item) => fileKey(item.file)));
+        if (!state.preview.selectedSourceKey || !availableKeys.has(state.preview.selectedSourceKey)) {
+          state.preview.selectedSourceKey = fileKey(state.sources[0].file);
+        }
+      }
+
+      function getSelectedSource() {
+        ensureValidPreviewSelection();
+        return state.sources.find((item) => fileKey(item.file) === state.preview.selectedSourceKey) || null;
+      }
+
+      function supportsWorkerCompositor() {
+        return (
+          typeof Worker !== 'undefined' &&
+          typeof Blob !== 'undefined' &&
+          typeof URL !== 'undefined' &&
+          typeof URL.createObjectURL === 'function' &&
+          typeof OffscreenCanvas !== 'undefined' &&
+          typeof createImageBitmap === 'function'
+        );
+      }
+
+      function getPreferredWorkerCount(totalItems = state.sources.length) {
+        const hardwareThreads = Number(navigator.hardwareConcurrency) || 4;
+        const suggested = hardwareThreads >= 8 ? 3 : hardwareThreads >= 4 ? 2 : 1;
+        return Math.max(1, Math.min(totalItems || 1, suggested, MAX_WORKER_CONCURRENCY));
+      }
+
+      function syncBatchLiveCounts() {
+        state.batch.activeCount = state.batch.activeSourceKeys.length;
+        state.batch.queuedCount = Math.max(0, state.batch.totalCount - state.batch.completedCount - state.batch.activeCount);
+      }
+
+      function markSourceActive(sourceItem) {
+        const key = fileKey(sourceItem.file);
+        if (!state.batch.activeSourceKeys.includes(key)) {
+          state.batch.activeSourceKeys.push(key);
+          state.batch.activeSourceNames.push(sourceItem.file.name);
+        }
+        syncBatchLiveCounts();
+      }
+
+      function unmarkSourceActive(sourceItem) {
+        const key = fileKey(sourceItem.file);
+        const index = state.batch.activeSourceKeys.indexOf(key);
+        if (index !== -1) {
+          state.batch.activeSourceKeys.splice(index, 1);
+          state.batch.activeSourceNames.splice(index, 1);
+        }
+        syncBatchLiveCounts();
+      }
+
+      function getActiveSourceSummary() {
+        const names = state.batch.activeSourceNames;
+        if (names.length === 0) return 'starting…';
+        if (names.length === 1) return names[0];
+        if (names.length === 2) return `${names[0]} + ${names[1]}`;
+        return `${names[0]} + ${names.length - 1} more`;
+      }
+
+      function yieldToBrowser() {
+        return new Promise((resolve) => {
+          requestAnimationFrame(() => {
+            window.setTimeout(resolve, 0);
+          });
+        });
+      }
+
+      function zipLibraryReady() {
+        return (
+          typeof Blob !== 'undefined' &&
+          typeof Uint8Array !== 'undefined' &&
+          typeof DataView !== 'undefined' &&
+          typeof TextEncoder !== 'undefined'
+        );
+      }
+
+      const ZIP_STORE_METHOD = 0;
+      const ZIP_GENERAL_PURPOSE_UTF8_FLAG = 0x0800;
+      const ZIP_VERSION_NEEDED = 20;
+      const ZIP_VERSION_MADE_BY = 20;
+      const ZIP_UINT16_LIMIT = 0xffff;
+      const ZIP_UINT32_LIMIT = 0xffffffff;
+
+      function createCrc32Table() {
+        const table = new Uint32Array(256);
+        for (let index = 0; index < 256; index += 1) {
+          let value = index;
+          for (let bit = 0; bit < 8; bit += 1) {
+            value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+          }
+          table[index] = value >>> 0;
+        }
+        return table;
+      }
+
+      const CRC32_TABLE = createCrc32Table();
+
+      function crc32Uint8(bytes) {
+        let crc = 0xffffffff;
+        for (let index = 0; index < bytes.length; index += 1) {
+          crc = CRC32_TABLE[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function getZipDosDateTime(date = new Date()) {
+        const year = Math.min(2107, Math.max(1980, date.getFullYear()));
+        const month = Math.min(12, Math.max(1, date.getMonth() + 1));
+        const day = Math.min(31, Math.max(1, date.getDate()));
+        const hours = Math.min(23, Math.max(0, date.getHours()));
+        const minutes = Math.min(59, Math.max(0, date.getMinutes()));
+        const seconds = Math.min(59, Math.max(0, date.getSeconds()));
+        return {
+          dosTime: ((hours & 0x1f) << 11) | ((minutes & 0x3f) << 5) | ((Math.floor(seconds / 2)) & 0x1f),
+          dosDate: (((year - 1980) & 0x7f) << 9) | ((month & 0x0f) << 5) | (day & 0x1f),
+        };
+      }
+
+      function createZipLocalHeader({ nameBytes, crc32, size, dosTime, dosDate }) {
+        const header = new Uint8Array(30 + nameBytes.length);
+        const view = new DataView(header.buffer);
+        view.setUint32(0, 0x04034b50, true);
+        view.setUint16(4, ZIP_VERSION_NEEDED, true);
+        view.setUint16(6, ZIP_GENERAL_PURPOSE_UTF8_FLAG, true);
+        view.setUint16(8, ZIP_STORE_METHOD, true);
+        view.setUint16(10, dosTime, true);
+        view.setUint16(12, dosDate, true);
+        view.setUint32(14, crc32 >>> 0, true);
+        view.setUint32(18, size >>> 0, true);
+        view.setUint32(22, size >>> 0, true);
+        view.setUint16(26, nameBytes.length, true);
+        view.setUint16(28, 0, true);
+        header.set(nameBytes, 30);
+        return header;
+      }
+
+      function createZipCentralHeader({ nameBytes, crc32, size, dosTime, dosDate, offset }) {
+        const header = new Uint8Array(46 + nameBytes.length);
+        const view = new DataView(header.buffer);
+        view.setUint32(0, 0x02014b50, true);
+        view.setUint16(4, ZIP_VERSION_MADE_BY, true);
+        view.setUint16(6, ZIP_VERSION_NEEDED, true);
+        view.setUint16(8, ZIP_GENERAL_PURPOSE_UTF8_FLAG, true);
+        view.setUint16(10, ZIP_STORE_METHOD, true);
+        view.setUint16(12, dosTime, true);
+        view.setUint16(14, dosDate, true);
+        view.setUint32(16, crc32 >>> 0, true);
+        view.setUint32(20, size >>> 0, true);
+        view.setUint32(24, size >>> 0, true);
+        view.setUint16(28, nameBytes.length, true);
+        view.setUint16(30, 0, true);
+        view.setUint16(32, 0, true);
+        view.setUint16(34, 0, true);
+        view.setUint16(36, 0, true);
+        view.setUint32(38, 0, true);
+        view.setUint32(42, offset >>> 0, true);
+        header.set(nameBytes, 46);
+        return header;
+      }
+
+      function createZipEndRecord({ entryCount, centralDirectorySize, centralDirectoryOffset }) {
+        const record = new Uint8Array(22);
+        const view = new DataView(record.buffer);
+        view.setUint32(0, 0x06054b50, true);
+        view.setUint16(4, 0, true);
+        view.setUint16(6, 0, true);
+        view.setUint16(8, entryCount, true);
+        view.setUint16(10, entryCount, true);
+        view.setUint32(12, centralDirectorySize >>> 0, true);
+        view.setUint32(16, centralDirectoryOffset >>> 0, true);
+        view.setUint16(20, 0, true);
+        return record;
+      }
+
+      async function buildStoredZipBlob(results, { onEntry } = {}) {
+        if (!zipLibraryReady()) {
+          throw new Error('The embedded ZIP builder is unavailable in this browser.');
+        }
+
+        if (results.length > ZIP_UINT16_LIMIT) {
+          throw new Error('This offline ZIP builder supports at most 65,535 files per archive.');
+        }
+
+        const encoder = new TextEncoder();
+        const chunks = [];
+        const centralDirectoryChunks = [];
+        const entries = [];
+        const timestamp = getZipDosDateTime(new Date());
+        let offset = 0;
+
+        for (let index = 0; index < results.length; index += 1) {
+          const result = results[index];
+          const entryName = result.zipEntryName || result.outputName;
+          const nameBytes = encoder.encode(entryName);
+          if (nameBytes.length > ZIP_UINT16_LIMIT) {
+            throw new Error(`ZIP entry name is too long: ${entryName}`);
+          }
+          if (result.blob.size > ZIP_UINT32_LIMIT) {
+            throw new Error(`ZIP entry exceeds the 4 GiB size limit of this offline build: ${entryName}`);
+          }
+
+          const bytes = new Uint8Array(await result.blob.arrayBuffer());
+          const crc32 = crc32Uint8(bytes);
+          const localHeader = createZipLocalHeader({
+            nameBytes,
+            crc32,
+            size: bytes.length,
+            dosTime: timestamp.dosTime,
+            dosDate: timestamp.dosDate,
+          });
+
+          if ((offset + localHeader.length + bytes.length) > ZIP_UINT32_LIMIT) {
+            throw new Error('ZIP archive would exceed the 4 GiB size limit of this offline build.');
+          }
+
+          chunks.push(localHeader, bytes);
+          entries.push({
+            nameBytes,
+            crc32,
+            size: bytes.length,
+            dosTime: timestamp.dosTime,
+            dosDate: timestamp.dosDate,
+            offset,
+          });
+          offset += localHeader.length + bytes.length;
+
+          if (typeof onEntry === 'function') {
+            await onEntry(index + 1, results.length, result);
+          }
+        }
+
+        const centralDirectoryOffset = offset;
+        let centralDirectorySize = 0;
+        for (const entry of entries) {
+          const centralHeader = createZipCentralHeader(entry);
+          centralDirectoryChunks.push(centralHeader);
+          centralDirectorySize += centralHeader.length;
+        }
+
+        if ((centralDirectoryOffset + centralDirectorySize) > ZIP_UINT32_LIMIT) {
+          throw new Error('ZIP central directory would exceed the 4 GiB size limit of this offline build.');
+        }
+
+        chunks.push(...centralDirectoryChunks);
+        chunks.push(createZipEndRecord({
+          entryCount: entries.length,
+          centralDirectorySize,
+          centralDirectoryOffset,
+        }));
+
+        return new Blob(chunks, { type: 'application/zip' });
+      }
+
+      function ensureZipFilename(name) {
+        const trimmed = String(name || '').trim();
+        if (!trimmed) {
+          return '';
+        }
+        return trimmed.toLowerCase().endsWith('.zip') ? trimmed : `${trimmed}.zip`;
+      }
+
+      function getOrderedBatchResults() {
+        const resultMap = new Map(state.batch.results.map((item) => [item.sourceKey, item]));
+        const ordered = [];
+        for (const sourceItem of state.sources) {
+          const key = fileKey(sourceItem.file);
+          const result = resultMap.get(key);
+          if (result) {
+            ordered.push(result);
+            resultMap.delete(key);
+          }
+        }
+        for (const result of resultMap.values()) {
+          ordered.push(result);
+        }
+        return ordered;
+      }
+
+      function buildUniqueZipEntries(results) {
+        const usedNames = new Set();
+        return results.map((result) => {
+          const originalName = result.outputName;
+          if (!usedNames.has(originalName)) {
+            usedNames.add(originalName);
+            return { ...result, zipEntryName: originalName };
+          }
+
+          const dotIndex = originalName.lastIndexOf('.');
+          const baseName = dotIndex > 0 ? originalName.slice(0, dotIndex) : originalName;
+          const extension = dotIndex > 0 ? originalName.slice(dotIndex) : '';
+          let copyIndex = 2;
+          let candidate = `${baseName} (${copyIndex})${extension}`;
+          while (usedNames.has(candidate)) {
+            copyIndex += 1;
+            candidate = `${baseName} (${copyIndex})${extension}`;
+          }
+          usedNames.add(candidate);
+          return { ...result, zipEntryName: candidate };
+        });
+      }
+
+      function triggerBlobDownload(blob, filename) {
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        anchor.rel = 'noopener';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => {
+          URL.revokeObjectURL(objectUrl);
+        }, 60000);
+      }
+
+      function isCancellationError(error) {
+        const message = error?.message || '';
+        return message === BATCH_CANCELLED_MESSAGE || /cancelled/i.test(message);
+      }
+
+      function buildWorkerSource() {
+        return [
+          "'use strict';",
+          "self.onmessage = async (event) => {",
+          "  const data = event.data || {};",
+          "  if (data.type !== 'compose') return;",
+          "  const id = data.id;",
+          "  let sourceBitmap = null;",
+          "  let overlayBitmap = null;",
+          "  try {",
+          "    if (typeof OffscreenCanvas === 'undefined') throw new Error('OffscreenCanvas is unavailable in this worker environment.');",
+          "    if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap is unavailable in this worker environment.');",
+          "    const sourceBlob = new Blob([data.sourceBuffer], { type: data.sourceType || 'image/png' });",
+          "    const overlayBlob = new Blob([data.overlayBuffer], { type: data.overlayType || 'image/png' });",
+          "    sourceBitmap = await createImageBitmap(sourceBlob);",
+          "    overlayBitmap = await createImageBitmap(overlayBlob);",
+          "    const canvas = new OffscreenCanvas(sourceBitmap.width, sourceBitmap.height);",
+          "    const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });",
+          "    if (!ctx) throw new Error('Failed to acquire OffscreenCanvas 2D context.');",
+          "    ctx.clearRect(0, 0, canvas.width, canvas.height);",
+          "    ctx.imageSmoothingEnabled = true;",
+          "    try { ctx.imageSmoothingQuality = 'high'; } catch (_) { }",
+          "    ctx.drawImage(sourceBitmap, 0, 0, canvas.width, canvas.height);",
+          "    if (data.overlayMode === 'stretch') {",
+          "      ctx.drawImage(overlayBitmap, 0, 0, canvas.width, canvas.height);",
+          "    } else {",
+          "      const x = Math.round((canvas.width - overlayBitmap.width) / 2);",
+          "      const y = Math.round((canvas.height - overlayBitmap.height) / 2);",
+          "      ctx.drawImage(overlayBitmap, x, y, overlayBitmap.width, overlayBitmap.height);",
+          "    }",
+          "    const blob = await canvas.convertToBlob({ type: 'image/png' });",
+          "    const pngBuffer = await blob.arrayBuffer();",
+          "    self.postMessage({ id, ok: true, pngBuffer, width: canvas.width, height: canvas.height, byteLength: pngBuffer.byteLength }, [pngBuffer]);",
+          "  } catch (error) {",
+          "    self.postMessage({ id, ok: false, error: error && error.message ? error.message : String(error) });",
+          "  } finally {",
+          "    if (sourceBitmap && typeof sourceBitmap.close === 'function') { try { sourceBitmap.close(); } catch (_) { } }",
+          "    if (overlayBitmap && typeof overlayBitmap.close === 'function') { try { overlayBitmap.close(); } catch (_) { } }",
+          "  }",
+          "};",
+        ].join('\n');
+      }
+
+      function destroyWorkerHandle(handle, rejectionMessage = '') {
+        if (!handle) return;
+
+        if (handle.pending) {
+          clearTimeout(handle.pending.timeoutId);
+          handle.pending.reject(new Error(rejectionMessage || 'Worker compositor stopped unexpectedly.'));
+          handle.pending = null;
+        }
+
+        if (handle.worker) {
+          try { handle.worker.terminate(); } catch (_) { }
+          handle.worker = null;
+        }
+      }
+
+      function destroyBatchWorkers(rejectionMessage = '') {
+        for (const handle of batchRuntime.workerHandles) {
+          destroyWorkerHandle(handle, rejectionMessage);
+        }
+        batchRuntime.workerHandles = [];
+
+        if (batchRuntime.workerUrl) {
+          URL.revokeObjectURL(batchRuntime.workerUrl);
+          batchRuntime.workerUrl = null;
+        }
+      }
+
+      function createWorkerHandle(url) {
+        const worker = new Worker(url);
+        const handle = { worker, pending: null };
+
+        worker.onmessage = (event) => {
+          const data = event.data || {};
+          if (!handle.pending || data.id !== handle.pending.id) {
+            return;
+          }
+
+          const pending = handle.pending;
+          handle.pending = null;
+          clearTimeout(pending.timeoutId);
+
+          if (data.ok) {
+            pending.resolve(data);
+          } else {
+            pending.reject(new Error(data.error || 'Worker compositor task failed.'));
+          }
+        };
+
+        worker.onerror = (event) => {
+          const message = event?.message ? `Worker compositor error: ${event.message}` : 'Worker compositor error.';
+          if (handle.pending) {
+            const pending = handle.pending;
+            handle.pending = null;
+            clearTimeout(pending.timeoutId);
+            pending.reject(new Error(message));
+          }
+          if (handle.worker) {
+            try { handle.worker.terminate(); } catch (_) { }
+            handle.worker = null;
+          }
+        };
+
+        return handle;
+      }
+
+      function createBatchWorkers(count) {
+        if (!supportsWorkerCompositor()) {
+          throw new Error('Worker compositor prerequisites are unavailable in this browser.');
+        }
+
+        destroyBatchWorkers();
+        const blob = new Blob([buildWorkerSource()], { type: 'text/javascript' });
+        const url = URL.createObjectURL(blob);
+        batchRuntime.workerUrl = url;
+        batchRuntime.workerHandles = Array.from({ length: count }, () => createWorkerHandle(url));
+        return batchRuntime.workerHandles;
+      }
+
+      function postComposeTaskToHandle(handle, payload, transferables = []) {
+        return new Promise((resolve, reject) => {
+          if (!handle || !handle.worker) {
+            reject(new Error('Worker handle is unavailable.'));
+            return;
+          }
+
+          if (handle.pending) {
+            reject(new Error('Worker handle is already busy.'));
+            return;
+          }
+
+          const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+          const timeoutId = window.setTimeout(() => {
+            destroyWorkerHandle(handle, 'Worker compositor task timed out.');
+          }, WORKER_TASK_TIMEOUT);
+
+          handle.pending = { id, resolve, reject, timeoutId };
+
+          try {
+            handle.worker.postMessage({ type: 'compose', id, ...payload }, transferables);
+          } catch (error) {
+            clearTimeout(timeoutId);
+            handle.pending = null;
+            reject(error);
+          }
+        });
+      }
+
+      async function composeSourceWithWorkerHandle(handle, sourceItem, overlayData, overlayMode, overlayBufferMaster) {
+        const sourceBuffer = await sourceItem.file.arrayBuffer();
+        const overlayBuffer = overlayBufferMaster.slice(0);
+
+        const response = await postComposeTaskToHandle(handle, {
+          sourceBuffer,
+          sourceType: sourceItem.file.type || 'image/png',
+          overlayBuffer,
+          overlayType: overlayData.file.type || 'image/png',
+          overlayMode,
+        }, [sourceBuffer, overlayBuffer]);
+
+        const outputBlob = new Blob([response.pngBuffer], { type: 'image/png' });
+
+        return {
+          blob: outputBlob,
+          width: response.width,
+          height: response.height,
+          engine: 'worker',
+        };
+      }
+
+      async function composeSourceOnMainThread(sourceItem, overlayData, overlayMode) {
+        let sourceDrawable = null;
+        let overlayDrawable = null;
+
+        try {
+          [sourceDrawable, overlayDrawable] = await Promise.all([
+            decodeRenderable(sourceItem.file),
+            decodeRenderable(overlayData.file),
+          ]);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = sourceItem.width;
+          canvas.height = sourceItem.height;
+
+          const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+          if (!ctx) {
+            throw new Error('Could not acquire a 2D canvas context for main-thread processing.');
+          }
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.imageSmoothingEnabled = true;
+          try { ctx.imageSmoothingQuality = 'high'; } catch (_) { }
+
+          ctx.drawImage(sourceDrawable, 0, 0, canvas.width, canvas.height);
+
+          if (overlayMode === 'stretch') {
+            ctx.drawImage(overlayDrawable, 0, 0, canvas.width, canvas.height);
+          } else {
+            const x = Math.round((canvas.width - overlayData.width) / 2);
+            const y = Math.round((canvas.height - overlayData.height) / 2);
+            ctx.drawImage(overlayDrawable, x, y, overlayData.width, overlayData.height);
+          }
+
+          const outputBlob = await new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Canvas PNG encoding failed.'));
+              }
+            }, 'image/png');
+          });
+
+          return {
+            blob: outputBlob,
+            width: canvas.width,
+            height: canvas.height,
+            engine: 'main-thread fallback',
+          };
+        } finally {
+          releaseRenderable(sourceDrawable);
+          releaseRenderable(overlayDrawable);
+        }
+      }
+
+      function renderAll() {
+        ensureValidPreviewSelection();
+        renderSources();
+        renderOverlay();
+        renderSettings();
+        renderSourceInsights();
+        renderSessionNotice();
+        renderPreviewPanel();
+        renderProgress();
+        renderLog();
+        renderActions();
+      }
+
+      function renderSources() {
+        const count = state.sources.length;
+        const selectedSource = getSelectedSource();
+        const selectedKey = selectedSource ? fileKey(selectedSource.file) : null;
+
+        dom.sourceCountPill.textContent = `${count} file${count === 1 ? '' : 's'}`;
+        dom.statSourceCount.textContent = String(count);
+
+        if (count === 0) {
+          dom.sourceList.innerHTML = '<div class="empty-state">No source images loaded yet.</div>';
+          return;
+        }
+
+        dom.sourceList.innerHTML = state.sources.map((item, index) => {
+          const key = fileKey(item.file);
+          const isSelected = key === selectedKey;
+          const batchResult = getBatchResultForKey(key);
+          const isProcessingThis = isBatchProcessing() && state.batch.activeSourceKeys.includes(key);
+
+          let statusBadge = '<span class="badge">Source ready</span>';
+          if (batchResult) {
+            statusBadge = `<span class="badge ok">PNG ready · ${formatBytes(batchResult.byteSize)}</span>`;
+          } else if (isProcessingThis) {
+            statusBadge = '<span class="badge">Processing…</span>';
+          }
+
+          return `
+            <button class="source-item-button${isSelected ? ' is-selected' : ''}" type="button" data-source-key="${escapeHtml(key)}" aria-pressed="${isSelected ? 'true' : 'false'}">
+              <div class="source-index">${index + 1}</div>
+              <div class="source-main">
+                <div class="source-name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</div>
+                <div class="source-sub">${item.width} × ${item.height} px · ${escapeHtml(item.file.type || 'unknown type')} · ${formatBytes(item.file.size)}</div>
+              </div>
+              <div class="source-badges">
+                ${statusBadge}
+                ${isSelected ? '<span class="badge">Preview target</span>' : '<span class="badge">Click to preview</span>'}
+              </div>
+            </button>
+          `;
+        }).join('');
+      }
+
+      function renderOverlay() {
+        if (!state.overlay) {
+          dom.overlayMetaName.textContent = '—';
+          dom.overlayMetaDimensions.textContent = '—';
+          dom.overlayMetaSize.textContent = '—';
+          dom.overlayMetaType.textContent = '—';
+          dom.statOverlayState.textContent = 'Missing';
+          dom.overlayPill.textContent = 'PNG';
+          dom.overlayPreviewImage.hidden = true;
+          dom.overlayPreviewImage.removeAttribute('src');
+          dom.overlayPlaceholder.hidden = false;
+          return;
+        }
+
+        const { file, width, height, objectUrl } = state.overlay;
+        dom.overlayMetaName.textContent = file.name;
+        dom.overlayMetaDimensions.textContent = formatDimensions(width, height);
+        dom.overlayMetaSize.textContent = formatBytes(file.size);
+        dom.overlayMetaType.textContent = file.type || 'image/png';
+        dom.statOverlayState.textContent = 'Loaded';
+        dom.overlayPill.textContent = `${width}×${height}`;
+        dom.overlayPreviewImage.src = objectUrl;
+        dom.overlayPreviewImage.hidden = false;
+        dom.overlayPlaceholder.hidden = true;
+      }
+
+      function getOverlayModeLabel() {
+        return state.settings.overlayMode === 'center' ? 'Unscaled + centered' : 'Stretch to fit image';
+      }
+
+      function renderSettings() {
+        const buttons = dom.overlayModeGroup.querySelectorAll('button[data-overlay-mode]');
+        buttons.forEach((button) => {
+          const pressed = button.dataset.overlayMode === state.settings.overlayMode;
+          button.setAttribute('aria-pressed', String(pressed));
+          button.disabled = isBatchProcessing();
+        });
+
+        if (state.settings.overlayMode === 'center') {
+          dom.overlayModeDescription.textContent = 'Overlay remains at its original pixel dimensions and is centered horizontally and vertically over each source image.';
+          dom.previewOverlayLabel.textContent = 'Unscaled + centered';
+        } else {
+          dom.overlayModeDescription.textContent = 'Overlay is stretched to cover the full width and height of each source image. The final export remains PNG, but the overlay itself is resampled during stretching.';
+          dom.previewOverlayLabel.textContent = 'Stretch to fit image';
+        }
+      }
+
+      function renderPreviewPanel() {
+        const selectedSource = getSelectedSource();
+        const selectedKey = selectedSource ? fileKey(selectedSource.file) : null;
+        const selectedBatchResult = selectedKey ? getBatchResultForKey(selectedKey) : null;
+
+        dom.previewMetaSource.textContent = selectedSource ? selectedSource.file.name : '—';
+        dom.previewMetaOutput.textContent = selectedSource ? formatDimensions(selectedSource.width, selectedSource.height) : '—';
+        dom.previewMetaMode.textContent = getOverlayModeLabel();
+
+        if (state.preview.canvasWidth && state.preview.canvasHeight) {
+          const proxyText = state.preview.usedProxyScale ? ' (scaled preview proxy)' : ' (full source resolution)';
+          dom.previewMetaCanvas.textContent = `${state.preview.canvasWidth} × ${state.preview.canvasHeight} px${proxyText}`;
+        } else {
+          dom.previewMetaCanvas.textContent = '—';
+        }
+
+        if (state.preview.status === 'ready') {
+          dom.previewCanvas.hidden = false;
+          dom.previewState.hidden = true;
+          dom.previewPill.textContent = state.preview.usedProxyScale ? 'Proxy preview' : 'Ready';
+          dom.statPreviewState.textContent = 'Ready';
+
+          if (state.preview.usedProxyScale) {
+            dom.previewStatusNote.textContent = `Preview rendered using a scaled proxy canvas of ${state.preview.canvasWidth} × ${state.preview.canvasHeight} px to stay within browser canvas limits. Actual output sizing remains ${state.preview.outputWidth} × ${state.preview.outputHeight} px.`;
+          } else {
+            dom.previewStatusNote.textContent = `Preview rendered at full source resolution: ${state.preview.outputWidth} × ${state.preview.outputHeight} px.`;
+          }
+
+          if (selectedBatchResult) {
+            dom.previewStatusNote.textContent += ` Latest processed PNG for this selected source is ready in memory as "${selectedBatchResult.outputName}" (${formatBytes(selectedBatchResult.byteSize)}) via ${selectedBatchResult.engine}.`;
+          }
+
+          return;
+        }
+
+        dom.previewCanvas.hidden = true;
+        dom.previewState.hidden = false;
+        dom.previewStateText.textContent = state.preview.message;
+
+        if (state.preview.status === 'rendering') {
+          dom.previewPill.textContent = 'Rendering';
+          dom.statPreviewState.textContent = 'Rendering';
+        } else if (state.preview.status === 'error') {
+          dom.previewPill.textContent = 'Error';
+          dom.statPreviewState.textContent = 'Error';
+        } else {
+          dom.previewPill.textContent = 'Idle';
+          dom.statPreviewState.textContent = 'Idle';
+        }
+
+        if (!(state.sources.length > 0 && state.overlay)) {
+          dom.previewStatusNote.textContent = 'Load at least one source image and one overlay PNG. The preview will then render automatically. You can also click a source entry to switch the preview target.';
+        } else if (state.preview.status === 'rendering') {
+          dom.previewStatusNote.textContent = 'Preview render is in progress on the main thread.';
+        } else if (state.preview.status === 'error') {
+          dom.previewStatusNote.textContent = state.preview.message;
+        } else {
+          dom.previewStatusNote.textContent = 'Inputs are loaded. Press Refresh preview if you want to rerun the compositor manually.';
+        }
+      }
+
+      function renderProgress() {
+        const readiness = getSessionReadiness();
+        dom.progressBar.style.width = `${readiness.percent}%`;
+        dom.sessionReadiness.innerHTML = `<span class="status-dot ${readiness.className}"></span>${escapeHtml(readiness.label)}`;
+        dom.lastEvent.textContent = state.ui.lastEvent;
+
+        if (isZipBuilding()) {
+          const currentEntry = state.zip.currentEntryName ? ` · current: ${state.zip.currentEntryName}` : '';
+          dom.batchState.textContent = `Building "${state.zip.currentArchiveName}" · ${state.zip.completedEntries} / ${state.zip.totalEntries} entries packed${currentEntry}`;
+          dom.batchQueue.textContent = `${state.zip.completedEntries} / ${state.zip.totalEntries} entries`;
+          dom.batchEngine.textContent = 'Embedded ZIP';
+          return;
+        }
+
+        if (isBatchProcessing()) {
+          const currentSummary = getActiveSourceSummary();
+          dom.batchState.textContent = state.batch.cancelRequested
+            ? `Cancelling after ${state.batch.completedCount} / ${state.batch.totalCount} terminal items · active: ${currentSummary}`
+            : `${state.batch.completedCount} / ${state.batch.totalCount} complete · current: ${currentSummary}`;
+          dom.batchQueue.textContent = `${state.batch.activeCount} active · ${state.batch.queuedCount} queued`;
+          dom.batchEngine.textContent = state.batch.engineMode === 'worker'
+            ? `Worker pool ×${state.batch.concurrency}`
+            : 'Main-thread fallback ×1';
+          return;
+        }
+
+        if (state.zip.status === 'ready' && state.zip.lastArchiveName) {
+          dom.batchState.textContent = `ZIP ready: "${state.zip.lastArchiveName}" (${formatBytes(state.zip.lastArchiveSize)})`;
+          dom.batchQueue.textContent = '0 active · 0 queued';
+          dom.batchEngine.textContent = 'Embedded ZIP';
+          return;
+        }
+
+        if (state.zip.status === 'error') {
+          dom.batchState.textContent = state.zip.error || 'ZIP build failed.';
+          dom.batchQueue.textContent = '0 active · 0 queued';
+          dom.batchEngine.textContent = 'Embedded ZIP';
+          return;
+        }
+
+        if (state.batch.status === 'cancelled') {
+          const skippedCount = Math.max(0, state.batch.totalCount - state.batch.completedCount);
+          const failureText = state.batch.failedCount > 0 ? ` · failures: ${state.batch.failedCount}` : '';
+          dom.batchState.textContent = `Batch cancelled. ${state.batch.results.length} PNG output${state.batch.results.length === 1 ? '' : 's'} kept in memory · skipped: ${skippedCount}${failureText}`;
+          dom.batchQueue.textContent = '0 active · queue stopped';
+          dom.batchEngine.textContent = state.batch.lastEngine || (state.batch.engineMode === 'worker' ? `Worker pool ×${state.batch.concurrency}` : 'Main-thread fallback ×1');
+          return;
+        }
+
+        if (hasBatchResults()) {
+          const failureText = state.batch.failedCount > 0 ? ` · failures: ${state.batch.failedCount}` : '';
+          dom.batchState.textContent = `${state.batch.results.length} PNG output${state.batch.results.length === 1 ? '' : 's'} ready in memory${failureText}`;
+          dom.batchQueue.textContent = '0 active · 0 queued';
+          dom.batchEngine.textContent = state.batch.lastEngine || '—';
+          return;
+        }
+
+        if (state.batch.status === 'error') {
+          dom.batchState.textContent = state.batch.message || 'Last batch run failed.';
+          dom.batchQueue.textContent = '0 active · 0 queued';
+          dom.batchEngine.textContent = state.batch.lastEngine || '—';
+          return;
+        }
+
+        dom.batchState.textContent = 'No processed PNG outputs yet.';
+        dom.batchQueue.textContent = '0 active · 0 queued';
+        dom.batchEngine.textContent = '—';
+      }
+
+      function renderLog() {
+        if (state.ui.logEntries.length === 0) {
+          dom.logList.innerHTML = '<div class="empty-state">No log entries yet.</div>';
+          return;
+        }
+
+        dom.logList.innerHTML = state.ui.logEntries.map((entry) => {
+          return `
+            <div class="log-entry">
+              <div class="time">${escapeHtml(entry.time)}</div>
+              <div class="text">${escapeHtml(entry.message)}</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderActions() {
+        const inputsReady = hasReadyInputs();
+        const batchBusy = isBatchProcessing();
+        const zipBusy = isZipBuilding();
+        const uiBusy = batchBusy || zipBusy;
+        const hasSources = state.sources.length > 0;
+        const hasOverlay = Boolean(state.overlay);
+        const hasSelectedSource = Boolean(getSelectedSource());
+        const hasLastZip = Boolean(state.zip.lastArchiveBlob && state.zip.lastArchiveName);
+
+        dom.previewButton.disabled = !inputsReady || uiBusy;
+        dom.batchButton.disabled = !inputsReady || uiBusy;
+        dom.cancelBatchButton.disabled = !batchBusy || state.batch.cancelRequested || zipBusy;
+        dom.zipButton.disabled = uiBusy || !hasBatchResults();
+
+        if (batchBusy) {
+          dom.batchButton.textContent = state.batch.cancelRequested
+            ? 'Cancelling…'
+            : `Processing ${state.batch.completedCount} / ${state.batch.totalCount}`;
+        } else {
+          dom.batchButton.textContent = 'Process batch to PNGs';
+        }
+
+        dom.cancelBatchButton.textContent = state.batch.cancelRequested ? 'Cancellation requested' : 'Cancel batch';
+
+        if (zipBusy) {
+          dom.zipButton.textContent = `Building ZIP ${state.zip.completedEntries} / ${state.zip.totalEntries}`;
+        } else {
+          dom.zipButton.textContent = hasBatchResults()
+            ? `Build ZIP (${state.batch.results.length})`
+            : 'Build ZIP';
+        }
+
+        dom.redownloadZipButton.textContent = hasLastZip && state.zip.lastArchiveName
+          ? `Download "${state.zip.lastArchiveName}" again`
+          : 'Download last ZIP again';
+
+        dom.pickSourcesButton.disabled = uiBusy;
+        dom.removeSelectedSourceButton.disabled = uiBusy || !hasSelectedSource;
+        dom.clearSourcesButton.disabled = uiBusy || !hasSources;
+        dom.pickOverlayButton.disabled = uiBusy;
+        dom.clearOverlayButton.disabled = uiBusy || !hasOverlay;
+        dom.resetAllButton.disabled = uiBusy;
+        dom.redownloadZipButton.disabled = uiBusy || !hasLastZip;
+        dom.outputSuffixInput.disabled = uiBusy;
+        dom.zipNameInput.disabled = uiBusy;
+
+        dom.sourceDropzone.classList.toggle('is-disabled', uiBusy);
+        dom.overlayDropzone.classList.toggle('is-disabled', uiBusy);
+        dom.sourceDropzone.setAttribute('aria-disabled', String(uiBusy));
+        dom.overlayDropzone.setAttribute('aria-disabled', String(uiBusy));
+      }
+
+      async function renderPreview(reason = 'manual') {
+        const selectedSource = getSelectedSource();
+        if (!selectedSource || !state.overlay) {
+          state.preview.status = 'idle';
+          state.preview.message = 'Load at least one source image and one overlay PNG to render the first real composite.';
+          state.preview.canvasWidth = null;
+          state.preview.canvasHeight = null;
+          state.preview.outputWidth = null;
+          state.preview.outputHeight = null;
+          state.preview.usedProxyScale = false;
+          renderPreviewPanel();
+          renderProgress();
+          return;
+        }
+
+        const requestId = ++state.preview.requestId;
+        state.preview.status = 'rendering';
+        state.preview.message = `Rendering preview for ${selectedSource.file.name}...`;
+        renderPreviewPanel();
+        renderProgress();
+
+        let sourceDrawable = null;
+        let overlayDrawable = null;
+
+        try {
+          [sourceDrawable, overlayDrawable] = await Promise.all([
+            decodeRenderable(selectedSource.file),
+            decodeRenderable(state.overlay.file),
+          ]);
+
+          if (requestId !== state.preview.requestId) {
+            return;
+          }
+
+          const plan = getPreviewRenderPlan(selectedSource.width, selectedSource.height);
+          const canvas = dom.previewCanvas;
+          canvas.width = plan.renderWidth;
+          canvas.height = plan.renderHeight;
+
+          const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+          if (!ctx) {
+            throw new Error('Could not acquire a 2D canvas context for preview rendering.');
+          }
+
+          ctx.clearRect(0, 0, plan.renderWidth, plan.renderHeight);
+          ctx.imageSmoothingEnabled = true;
+          try { ctx.imageSmoothingQuality = 'high'; } catch (_) { }
+
+          ctx.drawImage(sourceDrawable, 0, 0, plan.renderWidth, plan.renderHeight);
+
+          if (state.settings.overlayMode === 'center') {
+            const overlayWidth = Math.max(1, Math.round(state.overlay.width * plan.scale));
+            const overlayHeight = Math.max(1, Math.round(state.overlay.height * plan.scale));
+            const x = Math.round((plan.renderWidth - overlayWidth) / 2);
+            const y = Math.round((plan.renderHeight - overlayHeight) / 2);
+            ctx.drawImage(overlayDrawable, x, y, overlayWidth, overlayHeight);
+          } else {
+            ctx.drawImage(overlayDrawable, 0, 0, plan.renderWidth, plan.renderHeight);
+          }
+
+          if (requestId !== state.preview.requestId) {
+            return;
+          }
+
+          state.preview.status = 'ready';
+          state.preview.message = 'Preview rendered successfully.';
+          state.preview.renderedSourceName = selectedSource.file.name;
+          state.preview.outputWidth = selectedSource.width;
+          state.preview.outputHeight = selectedSource.height;
+          state.preview.canvasWidth = plan.renderWidth;
+          state.preview.canvasHeight = plan.renderHeight;
+          state.preview.usedProxyScale = plan.usesProxyScale;
+
+          renderPreviewPanel();
+          renderProgress();
+
+          if (reason === 'manual') {
+            addLog(`Preview refreshed for "${selectedSource.file.name}".`);
+          } else if (reason === 'selection') {
+            addLog(`Preview source changed to "${selectedSource.file.name}".`);
+          } else if (reason === 'mode') {
+            addLog(`Preview rerendered in ${getOverlayModeLabel().toLowerCase()} mode.`);
+          } else if (reason === 'inputs') {
+            addLog(`Preview rendered for "${selectedSource.file.name}" after input update.`);
+          }
+        } catch (error) {
+          if (requestId !== state.preview.requestId) {
+            return;
+          }
+
+          console.error(error);
+          state.preview.status = 'error';
+          state.preview.message = `Preview render failed: ${error?.message || 'Unknown error.'}`;
+          state.preview.canvasWidth = null;
+          state.preview.canvasHeight = null;
+          state.preview.outputWidth = selectedSource.width;
+          state.preview.outputHeight = selectedSource.height;
+          state.preview.usedProxyScale = false;
+          renderPreviewPanel();
+          renderProgress();
+          addLog(`Preview render failed for "${selectedSource.file.name}".`);
+        } finally {
+          releaseRenderable(sourceDrawable);
+          releaseRenderable(overlayDrawable);
+        }
+      }
+
+      async function processBatch() {
+        if (!hasReadyInputs()) {
+          addLog('Batch processing is unavailable until source images and the overlay PNG are both loaded.');
+          return;
+        }
+
+        if (isBatchProcessing()) {
+          addLog('Batch processing is already running.');
+          return;
+        }
+
+        if (isZipBuilding()) {
+          addLog('Cannot start a new batch while ZIP assembly is running.');
+          return;
+        }
+
+        const sources = state.sources.slice();
+        const overlayData = state.overlay;
+        const runId = state.batch.runId + 1;
+
+        resetBatchState();
+        resetZipState();
+        state.batch.runId = runId;
+        state.batch.status = 'processing';
+        state.batch.totalCount = sources.length;
+        state.batch.queuedCount = sources.length;
+        state.batch.message = 'Batch processing is running.';
+        renderAll();
+
+        addLog(`Batch processing started for ${sources.length} source image${sources.length === 1 ? '' : 's'}.`);
+
+        let overlayBufferMaster = null;
+        let workerHandles = [];
+        let useWorkers = false;
+
+        if (supportsWorkerCompositor()) {
+          try {
+            const workerCount = getPreferredWorkerCount(sources.length);
+            overlayBufferMaster = await overlayData.file.arrayBuffer();
+            workerHandles = createBatchWorkers(workerCount);
+            useWorkers = true;
+            state.batch.engineMode = 'worker';
+            state.batch.concurrency = workerHandles.length;
+            state.batch.lastEngine = `Worker pool ×${workerHandles.length}`;
+            renderProgress();
+            renderActions();
+            addLog(`Worker pool initialized with ${workerHandles.length} slot${workerHandles.length === 1 ? '' : 's'}. Active processing is bounded to ${workerHandles.length} concurrent task${workerHandles.length === 1 ? '' : 's'}.`);
+          } catch (error) {
+            destroyBatchWorkers();
+            useWorkers = false;
+            state.batch.engineMode = 'main-thread fallback';
+            state.batch.concurrency = 1;
+            state.batch.lastEngine = 'Main-thread fallback ×1';
+            renderProgress();
+            renderActions();
+            addLog(`Worker pool could not be initialized. Using the main-thread fallback instead. (${error.message || 'Unknown error.'})`);
+          }
+        } else {
+          state.batch.engineMode = 'main-thread fallback';
+          state.batch.concurrency = 1;
+          state.batch.lastEngine = 'Main-thread fallback ×1';
+          renderProgress();
+          renderActions();
+          addLog('Worker compositor prerequisites are unavailable in this browser context. Using the main-thread fallback with single-file sequential processing.');
+        }
+
+        const queue = sources.slice();
+        const slotCount = useWorkers ? workerHandles.length : 1;
+
+        const runSlot = async (slotIndex) => {
+          const workerHandle = useWorkers ? workerHandles[slotIndex] : null;
+
+          while (true) {
+            if (state.batch.runId !== runId || state.batch.cancelRequested) {
+              return;
+            }
+
+            const sourceItem = queue.shift();
+            if (!sourceItem) {
+              return;
+            }
+
+            markSourceActive(sourceItem);
+            renderSources();
+            renderProgress();
+            renderActions();
+
+            try {
+              const result = useWorkers
+                ? await composeSourceWithWorkerHandle(workerHandle, sourceItem, overlayData, state.settings.overlayMode, overlayBufferMaster)
+                : await composeSourceOnMainThread(sourceItem, overlayData, state.settings.overlayMode);
+
+              const outputName = makeOutputFilename(sourceItem.file.name, state.settings.outputSuffix);
+              state.batch.results.push({
+                sourceKey: fileKey(sourceItem.file),
+                sourceName: sourceItem.file.name,
+                outputName,
+                blob: result.blob,
+                width: result.width,
+                height: result.height,
+                byteSize: result.blob.size,
+                engine: result.engine,
+              });
+
+              state.batch.completedCount += 1;
+              state.batch.lastEngine = useWorkers ? `Worker pool ×${state.batch.concurrency}` : result.engine;
+              addLog(`Processed "${sourceItem.file.name}" → "${outputName}" (${formatBytes(result.blob.size)}) via ${result.engine}.`);
+            } catch (error) {
+              if (isCancellationError(error) || state.batch.cancelRequested || state.batch.runId !== runId) {
+                return;
+              }
+
+              console.error(error);
+              state.batch.completedCount += 1;
+              state.batch.failedCount += 1;
+              addLog(`Failed to process "${sourceItem.file.name}": ${error?.message || 'Unknown error.'}`);
+            } finally {
+              unmarkSourceActive(sourceItem);
+              renderSources();
+              renderPreviewPanel();
+              renderProgress();
+              renderActions();
+              await yieldToBrowser();
+            }
+          }
+        };
+
+        await Promise.allSettled(Array.from({ length: slotCount }, (_, index) => runSlot(index)));
+
+        destroyBatchWorkers(state.batch.cancelRequested ? BATCH_CANCELLED_MESSAGE : '');
+
+        if (state.batch.runId !== runId) {
+          return;
+        }
+
+        state.batch.activeSourceKeys = [];
+        state.batch.activeSourceNames = [];
+        syncBatchLiveCounts();
+
+        if (state.batch.cancelRequested) {
+          const skippedCount = Math.max(0, state.batch.totalCount - state.batch.completedCount);
+          state.batch.status = 'cancelled';
+          state.batch.message = `Batch cancelled after ${state.batch.completedCount} terminal item${state.batch.completedCount === 1 ? '' : 's'}. ${skippedCount} item${skippedCount === 1 ? '' : 's'} were skipped.`;
+          renderAll();
+          addLog(`Batch cancelled. ${state.batch.results.length} PNG output${state.batch.results.length === 1 ? '' : 's'} remain ready in memory; ${skippedCount} item${skippedCount === 1 ? '' : 's'} were skipped.`);
+          return;
+        }
+
+        if (state.batch.failedCount > 0 && state.batch.results.length === 0) {
+          state.batch.status = 'error';
+          state.batch.message = 'Batch processing failed. No PNG outputs were produced.';
+        } else {
+          state.batch.status = 'ready';
+          state.batch.message = `Batch processing finished with ${state.batch.results.length} PNG output${state.batch.results.length === 1 ? '' : 's'} ready in memory.`;
+        }
+
+        renderAll();
+
+        if (state.batch.failedCount > 0) {
+          addLog(`Batch processing finished. ${state.batch.results.length} PNG output${state.batch.results.length === 1 ? '' : 's'} ready in memory, ${state.batch.failedCount} failed.`);
+        } else {
+          addLog(`Batch processing complete. ${state.batch.results.length} PNG output${state.batch.results.length === 1 ? '' : 's'} ready in memory.`);
+        }
+      }
+
+      function requestBatchCancel() {
+        if (!isBatchProcessing()) {
+          addLog('No batch run is currently active.');
+          return;
+        }
+
+        if (state.batch.cancelRequested) {
+          addLog('Cancellation has already been requested for the current batch.');
+          return;
+        }
+
+        state.batch.cancelRequested = true;
+        state.batch.message = 'Cancellation requested.';
+        renderProgress();
+        renderActions();
+
+        if (state.batch.engineMode === 'worker') {
+          destroyBatchWorkers(BATCH_CANCELLED_MESSAGE);
+          addLog('Cancellation requested. Active worker tasks are being terminated and queued work will stop.');
+        } else {
+          addLog('Cancellation requested. Main-thread fallback cannot interrupt the file already in progress, but queued work will stop immediately after it finishes.');
+        }
+      }
+
+      async function ingestSourceFiles(fileList) {
+        if (isBatchProcessing()) {
+          addLog('Cannot change the source image set while batch processing is running.');
+          return;
+        }
+
+        const incomingFiles = Array.from(fileList || []);
+        const files = incomingFiles.filter((file) => looksLikeImageFile(file));
+        const rejectedCount = incomingFiles.length - files.length;
+        if (files.length === 0) {
+          addLog('No valid source images were found in that selection.');
+          return;
+        }
+
+        if (rejectedCount > 0) {
+          addLog(`Ignored ${formatCount(rejectedCount, 'non-image file')} during source import.`);
+        }
+
+        const existingKeys = new Set(state.sources.map((item) => fileKey(item.file)));
+        const newFiles = files.filter((file) => !existingKeys.has(fileKey(file)));
+
+        if (newFiles.length === 0) {
+          addLog('All selected source images were already present in the list.');
+          return;
+        }
+
+        addLog(`Reading metadata for ${newFiles.length} source image${newFiles.length === 1 ? '' : 's'}...`);
+
+        let addedCount = 0;
+        for (const file of newFiles) {
+          try {
+            const { width, height } = await readImageMetadata(file);
+            state.sources.push({ file, width, height });
+            addedCount += 1;
+          } catch (_) {
+            addLog(`Skipped source image "${file.name}" because it could not be decoded.`);
+          }
+        }
+
+        if (addedCount === 0) {
+          renderAll();
+          return;
+        }
+
+        state.sources.sort((a, b) => a.file.name.localeCompare(b.file.name, undefined, { sensitivity: 'base' }));
+        ensureValidPreviewSelection();
+        invalidateBatchResults('Discarded processed PNG outputs because the source image set changed.');
+        addLog(`Source list updated. ${state.sources.length} source image${state.sources.length === 1 ? '' : 's'} ready.`);
+        renderAll();
+
+        if (state.overlay) {
+          renderPreview('inputs');
+        }
+      }
+
+      async function ingestOverlayFile(file) {
+        if (isBatchProcessing()) {
+          addLog('Cannot change the overlay while batch processing is running.');
+          return;
+        }
+
+        if (!file) return;
+
+        if (!isProbablyPng(file)) {
+          addLog(`Rejected overlay "${file.name}". Overlay input must be PNG only.`);
+          return;
+        }
+
+        try {
+          const { width, height } = await readImageMetadata(file);
+          releaseOverlayObjectUrl();
+          const objectUrl = URL.createObjectURL(file);
+          state.overlay = { file, width, height, objectUrl };
+          invalidateBatchResults('Discarded processed PNG outputs because the overlay image changed.');
+          addLog(`Overlay loaded: ${file.name} (${width} × ${height}).`);
+          renderAll();
+
+          if (state.sources.length > 0) {
+            renderPreview('inputs');
+          }
+        } catch (_) {
+          addLog(`Overlay PNG could not be decoded: "${file.name}".`);
+        }
+      }
+
+      function releaseOverlayObjectUrl() {
+        if (state.overlay && state.overlay.objectUrl) {
+          URL.revokeObjectURL(state.overlay.objectUrl);
+        }
+      }
+
+      function removeSelectedSource() {
+        if (isBatchProcessing() || isZipBuilding()) {
+          addLog(isZipBuilding() ? 'Cannot remove a source while ZIP assembly is running.' : 'Cannot remove a source while batch processing is running.');
+          return;
+        }
+
+        const selectedSource = getSelectedSource();
+        if (!selectedSource) {
+          addLog('No selected source image is available to remove.');
+          return;
+        }
+
+        const wouldDiscardResults = hasBatchResults() || Boolean(state.zip.lastArchiveBlob);
+        const confirmMessage = wouldDiscardResults
+          ? `Remove "${selectedSource.file.name}"? This will also discard the current processed PNG results and any stored ZIP download from this session.`
+          : `Remove "${selectedSource.file.name}" from the source list?`;
+
+        if (!confirmDestructiveAction(confirmMessage)) {
+          addLog('Source removal cancelled.');
+          return;
+        }
+
+        const selectedKey = fileKey(selectedSource.file);
+        state.sources = state.sources.filter((item) => fileKey(item.file) !== selectedKey);
+        ensureValidPreviewSelection();
+        invalidateBatchResults('Discarded processed PNG outputs because the source image set changed.');
+        if (!hasReadyInputs()) {
+          resetPreviewToWaiting();
+        }
+        dom.sourceInput.value = '';
+        addLog(`Removed source image "${selectedSource.file.name}".`);
+        renderAll();
+
+        if (hasReadyInputs()) {
+          renderPreview('inputs');
+        }
+      }
+
+      function clearSources() {
+        if (isBatchProcessing() || isZipBuilding()) {
+          addLog(isZipBuilding() ? 'Cannot clear sources while ZIP assembly is running.' : 'Cannot clear sources while batch processing is running.');
+          return;
+        }
+
+        const hadResults = hasBatchResults() || Boolean(state.zip.lastArchiveBlob);
+        if (state.sources.length > 0) {
+          const confirmMessage = hadResults
+            ? 'Clear all source images? This will also discard the current processed PNG results and any stored ZIP download from this session.'
+            : 'Clear all source images?';
+          if (!confirmDestructiveAction(confirmMessage)) {
+            addLog('Clearing source images cancelled.');
+            return;
+          }
+        }
+
+        state.sources = [];
+        state.preview.selectedSourceKey = null;
+        resetPreviewToWaiting();
+        resetBatchState();
+        resetZipState();
+        dom.sourceInput.value = '';
+        addLog(hadResults ? 'Cleared all source images. Existing processed PNG outputs were discarded.' : 'Cleared all source images.');
+        renderAll();
+      }
+
+      function clearOverlay() {
+        if (isBatchProcessing() || isZipBuilding()) {
+          addLog(isZipBuilding() ? 'Cannot clear the overlay while ZIP assembly is running.' : 'Cannot clear the overlay while batch processing is running.');
+          return;
+        }
+
+        const hadResults = hasBatchResults() || Boolean(state.zip.lastArchiveBlob);
+        if (state.overlay) {
+          const confirmMessage = hadResults
+            ? 'Clear the overlay image? This will also discard the current processed PNG results and any stored ZIP download from this session.'
+            : 'Clear the overlay image?';
+          if (!confirmDestructiveAction(confirmMessage)) {
+            addLog('Clearing the overlay image cancelled.');
+            return;
+          }
+        }
+
+        releaseOverlayObjectUrl();
+        state.overlay = null;
+        resetPreviewToWaiting();
+        resetBatchState();
+        resetZipState();
+        dom.overlayInput.value = '';
+        addLog(hadResults ? 'Cleared the overlay image. Existing processed PNG outputs were discarded.' : 'Cleared the overlay image.');
+        renderAll();
+      }
+
+      function clearSourcesSilently() {
+        state.sources = [];
+        state.preview.selectedSourceKey = null;
+        dom.sourceInput.value = '';
+      }
+
+      function clearOverlaySilently() {
+        releaseOverlayObjectUrl();
+        state.overlay = null;
+        dom.overlayInput.value = '';
+      }
+
+      function resetAll() {
+        if (isBatchProcessing() || isZipBuilding()) {
+          addLog(isZipBuilding() ? 'Cannot reset the session while ZIP assembly is running.' : 'Cannot reset the session while batch processing is running.');
+          return;
+        }
+
+        const hasSessionContent = state.sources.length > 0 || Boolean(state.overlay) || hasBatchResults() || Boolean(state.zip.lastArchiveBlob);
+        if (hasSessionContent && !confirmDestructiveAction('Reset the entire session to defaults? This will clear sources, overlay, processed PNG results, and any stored ZIP download from this session.')) {
+          addLog('Reset cancelled.');
+          return;
+        }
+
+        clearSourcesSilently();
+        clearOverlaySilently();
+        state.settings.overlayMode = 'center';
+        state.settings.outputSuffix = '_overlay';
+        state.settings.zipName = 'batch-overlay-output';
+        resetPreviewToWaiting();
+        resetBatchState();
+        resetZipState();
+        state.ui.lastEvent = 'App reset to defaults';
+        dom.outputSuffixInput.value = state.settings.outputSuffix;
+        dom.zipNameInput.value = state.settings.zipName;
+        addLog('Reset the entire session to defaults.');
+        renderAll();
+      }
+
+      function clearLog() {
+        state.ui.logEntries = [];
+        state.ui.lastEvent = 'Log cleared';
+        renderAll();
+      }
+
+      function onOverlayModeClick(event) {
+        const button = event.target.closest('button[data-overlay-mode]');
+        if (!button) return;
+
+        if (isBatchProcessing() || isZipBuilding()) {
+          addLog(isZipBuilding() ? 'Cannot change overlay mode while ZIP assembly is running.' : 'Cannot change overlay mode while batch processing is running.');
+          return;
+        }
+
+        const newMode = button.dataset.overlayMode;
+        if (newMode !== 'center' && newMode !== 'stretch') return;
+        if (newMode === state.settings.overlayMode) return;
+
+        state.settings.overlayMode = newMode;
+        invalidateBatchResults('Discarded processed PNG outputs because overlay mode changed.');
+        renderSettings();
+        renderPreviewPanel();
+
+        if (state.sources.length > 0 && state.overlay) {
+          renderPreview('mode');
+        } else {
+          addLog(`Overlay mode changed to ${getOverlayModeLabel().toLowerCase()}.`);
+        }
+      }
+
+      function onDropzoneKeyboard(event, input) {
+        if (isBatchProcessing() || isZipBuilding()) {
+          return;
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          input.click();
+        }
+      }
+
+      function wireDropzone(dropzone, { onFiles, single = false, validateFile = null }) {
+        const activate = (event) => {
+          if (isBatchProcessing() || isZipBuilding()) return;
+          event.preventDefault();
+          dropzone.classList.add('is-active');
+        };
+
+        const deactivate = (event) => {
+          event.preventDefault();
+          dropzone.classList.remove('is-active');
+        };
+
+        dropzone.addEventListener('dragenter', activate);
+        dropzone.addEventListener('dragover', activate);
+        dropzone.addEventListener('dragleave', deactivate);
+        dropzone.addEventListener('drop', async (event) => {
+          deactivate(event);
+          if (isBatchProcessing() || isZipBuilding()) {
+            addLog(isZipBuilding() ? 'Cannot drop new files while ZIP assembly is running.' : 'Cannot drop new files while batch processing is running.');
+            return;
+          }
+
+          const files = Array.from(event.dataTransfer?.files || []);
+          if (files.length === 0) return;
+
+          if (single) {
+            const first = files[0];
+            if (validateFile && !validateFile(first)) {
+              addLog(`Rejected dropped overlay "${first.name}". Overlay input must be PNG only.`);
+              return;
+            }
+            await onFiles(first);
+            return;
+          }
+
+          await onFiles(files);
+        });
+      }
+
+      async function handleBuildZip() {
+        const zipName = state.settings.zipName.trim();
+        if (!zipName) {
+          addLog('ZIP filename cannot be blank.');
+          return;
+        }
+
+        if (isBatchProcessing()) {
+          addLog('Cannot build the ZIP while batch processing is still running.');
+          return;
+        }
+
+        if (isZipBuilding()) {
+          addLog('ZIP assembly is already running.');
+          return;
+        }
+
+        if (!hasBatchResults()) {
+          addLog('Run Process batch to PNGs first so the PNG outputs exist in memory before building the ZIP.');
+          return;
+        }
+
+        if (!zipLibraryReady()) {
+          addLog('ZIP export is unavailable because the embedded ZIP builder is not supported in this browser.');
+          return;
+        }
+
+        const archiveName = ensureZipFilename(zipName);
+        if (!archiveName) {
+          addLog('ZIP filename cannot be blank.');
+          return;
+        }
+
+        const orderedResults = buildUniqueZipEntries(getOrderedBatchResults());
+        const renamedEntries = orderedResults.filter((item) => item.zipEntryName !== item.outputName).length;
+
+        state.zip.status = 'building';
+        state.zip.totalEntries = orderedResults.length;
+        state.zip.completedEntries = 0;
+        state.zip.currentEntryName = null;
+        state.zip.currentArchiveName = archiveName;
+        state.zip.error = null;
+        renderProgress();
+        renderActions();
+
+        addLog(`Starting ZIP build for ${orderedResults.length} PNG output${orderedResults.length === 1 ? '' : 's'} as "${archiveName}".`);
+        if (renamedEntries > 0) {
+          addLog(`Adjusted ${renamedEntries} ZIP entr${renamedEntries === 1 ? 'y name' : 'y names'} to avoid duplicate filenames inside the archive.`);
+        }
+
+        try {
+          const zipBlob = await buildStoredZipBlob(orderedResults, {
+            onEntry: async (completed, total, result) => {
+              state.zip.currentEntryName = result.zipEntryName;
+              state.zip.completedEntries = completed;
+              renderProgress();
+              renderActions();
+              await yieldToBrowser();
+            }
+          });
+          triggerBlobDownload(zipBlob, archiveName);
+          state.zip.status = 'ready';
+          state.zip.currentEntryName = null;
+          state.zip.currentArchiveName = null;
+          state.zip.lastArchiveName = archiveName;
+          state.zip.lastArchiveSize = zipBlob.size;
+          state.zip.lastArchiveBlob = zipBlob;
+          state.zip.error = null;
+          addLog(`ZIP ready: "${archiveName}" (${formatBytes(zipBlob.size)}). Download started.`);
+        } catch (error) {
+          state.zip.status = 'error';
+          state.zip.currentEntryName = null;
+          state.zip.currentArchiveName = null;
+          state.zip.error = `ZIP build failed: ${error?.message || 'Unknown error.'}`;
+          addLog(state.zip.error);
+          console.error(error);
+        } finally {
+          renderProgress();
+          renderActions();
+        }
+      }
+
+      function redownloadLastZip() {
+        if (isBatchProcessing() || isZipBuilding()) {
+          addLog(isZipBuilding() ? 'Cannot trigger another ZIP download while ZIP assembly is still running.' : 'Cannot trigger ZIP download while batch processing is still running.');
+          return;
+        }
+
+        if (!state.zip.lastArchiveBlob || !state.zip.lastArchiveName) {
+          addLog('No previously built ZIP archive is available to download again in this session.');
+          return;
+        }
+
+        triggerBlobDownload(state.zip.lastArchiveBlob, state.zip.lastArchiveName);
+        addLog(`Triggered another download for "${state.zip.lastArchiveName}".`);
+      }
+
+      function onSourceListClick(event) {
+        const button = event.target.closest('button[data-source-key]');
+        if (!button) return;
+        const nextKey = button.dataset.sourceKey;
+        if (!nextKey || nextKey === state.preview.selectedSourceKey) return;
+        state.preview.selectedSourceKey = nextKey;
+        renderSources();
+        renderPreview('selection');
+      }
+
+      function bindEvents() {
+        dom.pickSourcesButton.addEventListener('click', () => {
+          if (isBatchProcessing() || isZipBuilding()) return;
+          dom.sourceInput.click();
+        });
+
+        dom.pickOverlayButton.addEventListener('click', () => {
+          if (isBatchProcessing() || isZipBuilding()) return;
+          dom.overlayInput.click();
+        });
+
+        dom.clearSourcesButton.addEventListener('click', clearSources);
+        dom.removeSelectedSourceButton.addEventListener('click', removeSelectedSource);
+        dom.clearOverlayButton.addEventListener('click', clearOverlay);
+        dom.resetAllButton.addEventListener('click', resetAll);
+        dom.clearLogButton.addEventListener('click', clearLog);
+        dom.previewButton.addEventListener('click', () => renderPreview('manual'));
+        dom.batchButton.addEventListener('click', processBatch);
+        dom.cancelBatchButton.addEventListener('click', requestBatchCancel);
+        dom.zipButton.addEventListener('click', handleBuildZip);
+        dom.redownloadZipButton.addEventListener('click', redownloadLastZip);
+        dom.sourceList.addEventListener('click', onSourceListClick);
+
+        dom.sourceInput.addEventListener('change', async (event) => {
+          await ingestSourceFiles(event.target.files);
+        });
+
+        dom.overlayInput.addEventListener('change', async (event) => {
+          const file = event.target.files?.[0];
+          await ingestOverlayFile(file || null);
+        });
+
+        dom.outputSuffixInput.addEventListener('input', (event) => {
+          state.settings.outputSuffix = event.target.value;
+          refreshBatchResultNames();
+          if (state.zip.lastArchiveBlob) {
+            resetZipState();
+            addLog('Cleared the stored ZIP download because the output suffix changed.');
+          }
+          renderAll();
+        });
+
+        dom.zipNameInput.addEventListener('input', (event) => {
+          state.settings.zipName = event.target.value;
+        });
+
+        dom.overlayModeGroup.addEventListener('click', onOverlayModeClick);
+
+        dom.sourceDropzone.addEventListener('click', (event) => {
+          if (isBatchProcessing() || isZipBuilding()) return;
+          if (event.target.closest('button')) return;
+          dom.sourceInput.click();
+        });
+
+        dom.overlayDropzone.addEventListener('click', (event) => {
+          if (isBatchProcessing() || isZipBuilding()) return;
+          if (event.target.closest('button')) return;
+          dom.overlayInput.click();
+        });
+
+        dom.sourceDropzone.addEventListener('keydown', (event) => onDropzoneKeyboard(event, dom.sourceInput));
+        dom.overlayDropzone.addEventListener('keydown', (event) => onDropzoneKeyboard(event, dom.overlayInput));
+
+        wireDropzone(dom.sourceDropzone, {
+          onFiles: async (files) => ingestSourceFiles(files),
+          single: false,
+        });
+
+        wireDropzone(dom.overlayDropzone, {
+          onFiles: async (file) => ingestOverlayFile(file),
+          single: true,
+          validateFile: isProbablyPng,
+        });
+
+        let dragDepth = 0;
+        const hasFilePayload = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
+
+        window.addEventListener('dragenter', (event) => {
+          if (!hasFilePayload(event) || isBatchProcessing() || isZipBuilding()) return;
+          event.preventDefault();
+          dragDepth += 1;
+          dom.dragCurtain.hidden = false;
+        });
+
+        window.addEventListener('dragover', (event) => {
+          if (!hasFilePayload(event)) return;
+          event.preventDefault();
+          if (isBatchProcessing() || isZipBuilding()) {
+            event.dataTransfer.dropEffect = 'none';
+            return;
+          }
+          event.dataTransfer.dropEffect = 'copy';
+          dom.dragCurtain.hidden = false;
+        });
+
+        window.addEventListener('dragleave', (event) => {
+          if (!hasFilePayload(event)) return;
+          dragDepth = Math.max(0, dragDepth - 1);
+          if (dragDepth === 0) {
+            dom.dragCurtain.hidden = true;
+          }
+        });
+
+        window.addEventListener('drop', (event) => {
+          if (!hasFilePayload(event)) return;
+          event.preventDefault();
+          dragDepth = 0;
+          dom.dragCurtain.hidden = true;
+        });
+
+        window.addEventListener('beforeunload', () => {
+          releaseOverlayObjectUrl();
+          destroyBatchWorkers();
+        });
+      }
+
+      function init() {
+        bindEvents();
+        addLog('App shell ready. Import source images and one overlay PNG to continue.');
+        addLog('Phase 7 polish is active: stronger drag-and-drop handling, safer destructive actions, richer source diagnostics, and repeat ZIP download support are enabled.');
+        if (supportsWorkerCompositor()) {
+          const poolSize = getPreferredWorkerCount();
+          addLog(`Browser capability check passed for the worker compositor path. This build can run a bounded worker pool of up to ${poolSize} concurrent task${poolSize === 1 ? '' : 's'}.`);
+        } else {
+          addLog('Worker compositor prerequisites were not detected. This browser would use the main-thread fallback for PNG processing.');
+        }
+        if (zipLibraryReady()) {
+          addLog('Embedded ZIP builder ready. This build can create ZIP archives entirely offline.');
+        } else {
+          addLog('Embedded ZIP builder was not detected. This browser will not be able to create ZIP archives in the offline build.');
+        }
+        renderAll();
+      }
+
+      init();
+    })();
+  </script>
+
+</body>
+</html>
