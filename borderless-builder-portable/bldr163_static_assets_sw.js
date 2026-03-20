@@ -1,4 +1,4 @@
-const STATIC_CACHE_NAME = 'borderless-builder-static-v1';
+const STATIC_CACHE_NAME = 'borderless-builder-static-v2';
 const STATIC_PATH_MARKERS = [
   '/Fonts/',
   '/Overlays/',
@@ -15,7 +15,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const names = await caches.keys();
     await Promise.all(names.map((name) => {
-      if(name !== STATIC_CACHE_NAME) return Promise.resolve();
+      if(name !== STATIC_CACHE_NAME) return caches.delete(name);
       return Promise.resolve();
     }));
     await self.clients.claim();
@@ -39,7 +39,7 @@ self.addEventListener('fetch', (event) => {
 
     const networkPromise = fetch(request)
       .then((response) => {
-        if(response && response.ok){
+        if(response && response.ok && !response.headers.get('content-type')?.includes('text/html')){
           cache.put(request, response.clone()).catch(() => {});
         }
         return response;
