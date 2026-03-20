@@ -3532,6 +3532,7 @@
         const [page, setPage] = useState(() =>
           pageFromHash(window.location.hash),
         );
+        const [menuOpen, setMenuOpen] = useState(false);
 
         useEffect(() => {
           const onHash = () => setPage(pageFromHash(window.location.hash));
@@ -3548,42 +3549,36 @@
 
         return (
           <div>
-            <nav className="flex gap-1 p-2 bg-[#0a0a0a] border-b border-[#333]">
-              <a
-                href="#/"
-                onClick={() => setPage("prepper")}
-                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "prepper" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
-              >
-                Prepper
-              </a>
-              <a
-                href="#/merger"
-                onClick={() => setPage("merger")}
-                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "merger" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
-              >
-                Merger
-              </a>
-              <a
-                href="#/art-hunt"
-                onClick={() => setPage("art-hunt")}
-                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "art-hunt" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
-              >
-                Art Hunt
-              </a>
-              <a
-                href="/gwr"
-                target="_blank"
-                className="px-4 py-2 rounded text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800"
-              >
-                Watermark Remover ↗
-              </a>
-              <a
-                href="/gto"
-                target="_blank"
-                className="px-4 py-2 rounded text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800"
-              >
-                The Overlayer ↗
-              </a>
+            <nav className="bg-[#0a0a0a] border-b border-[#333]">
+              <div className="flex items-center gap-1 p-2">
+                {/* Desktop: all links inline */}
+                <div className="hidden sm:flex gap-1">
+                  <a href="#/" onClick={() => setPage("prepper")} className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "prepper" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Prepper</a>
+                  <a href="#/merger" onClick={() => setPage("merger")} className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "merger" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Merger</a>
+                  <a href="#/art-hunt" onClick={() => setPage("art-hunt")} className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "art-hunt" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Art Hunt</a>
+                  <a href="/gwr" target="_blank" className="px-4 py-2 rounded text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800">Watermark Remover ↗</a>
+                  <a href="/gto" target="_blank" className="px-4 py-2 rounded text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800">The Overlayer ↗</a>
+                  <a href="/bbp" target="_blank" className="px-4 py-2 rounded text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800">Borderless Builder ↗</a>
+                </div>
+                {/* Mobile: active page label + hamburger */}
+                <div className="flex sm:hidden items-center justify-between w-full">
+                  <span className="px-4 py-2 text-sm font-medium text-white capitalize">{page.replace("-", " ")}</span>
+                  <button onClick={() => setMenuOpen(o => !o)} className="px-3 py-2 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" aria-label="Toggle menu">
+                    {menuOpen ? "✕" : "☰"}
+                  </button>
+                </div>
+              </div>
+              {/* Mobile dropdown */}
+              {menuOpen && (
+                <div className="sm:hidden flex flex-col gap-1 px-2 pb-2">
+                  <a href="#/" onClick={() => { setPage("prepper"); setMenuOpen(false); }} className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "prepper" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Prepper</a>
+                  <a href="#/merger" onClick={() => { setPage("merger"); setMenuOpen(false); }} className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "merger" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Merger</a>
+                  <a href="#/art-hunt" onClick={() => { setPage("art-hunt"); setMenuOpen(false); }} className={`px-4 py-2 rounded text-sm font-medium transition-colors ${page === "art-hunt" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Art Hunt</a>
+                  <a href="/gwr" target="_blank" className="px-4 py-2 rounded text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800">Watermark Remover ↗</a>
+                  <a href="/gto" target="_blank" className="px-4 py-2 rounded text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800">The Overlayer ↗</a>
+                  <a href="/bbp" target="_blank" className="px-4 py-2 rounded text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-800">Borderless Builder ↗</a>
+                </div>
+              )}
             </nav>
             {page === "prepper" ? (
               <DetailPreserveImageResizer />
