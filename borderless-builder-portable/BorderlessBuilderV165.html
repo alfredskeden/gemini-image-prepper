@@ -2853,7 +2853,7 @@ artFile.addEventListener('change', async (e)=>{
     const frameType = getCardFrameType(card);
     const colorCode = getOverlayFolderColorCode(card);
     const sizeName = String(sizeKey || 'normal');
-    const sizeCap = sizeName.charAt(0).toUpperCase() + sizeName.slice(1).toLowerCase();
+    const sizeCap = sizeName.toUpperCase();
     return `Overlays/BorderlessAlt/${frameType}/${colorCode}/${colorCode}_${sizeCap}.png`;
   }
 
@@ -2892,7 +2892,7 @@ artFile.addEventListener('change', async (e)=>{
 
     const scryCode = state.scry ? getOverlayFolderColorCode(state.scry) : 'C';
     if(!cardIsLand(state.scry) && scryCode.length > 1){
-      const sizeCap = state.size.charAt(0).toUpperCase() + state.size.slice(1).toLowerCase();
+      const sizeCap = state.size.toUpperCase();
       const fallbackPath = `Overlays/BorderlessAlt/${frameType}/M/M_${sizeCap}.png`;
       debugGuideState.overlayFallbackPath = fallbackPath;
       const img2 = new Image();
