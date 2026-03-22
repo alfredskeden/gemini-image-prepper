@@ -277,7 +277,8 @@ src: url("Fonts/Beleren2016-Bold.ttf") format("truetype");
         <footer>
           <button id="btnExportPNG">Export PNG</button>
           <button id="btnExportZIP">Export Layers ZIP</button>
-          <div class="muted small" style="float:left;margin-top:8px">Note: PSD export with editable text requires server-side or Adobe APIs; ZIP of layers provided here.</div>
+          <button id="btnExportPSD">Export PSD</button>
+          <div class="muted small" style="float:left;margin-top:8px">Raster PSD export is included alongside PNG and ZIP layer export.</div>
         </footer>
 
       </div>
@@ -696,6 +697,7 @@ src: url("Fonts/Beleren2016-Bold.ttf") format("truetype");
   const flavorGapScaleReadout = document.getElementById('flavorGapScaleReadout');
   const btnExportPNG = document.getElementById('btnExportPNG');
   const btnExportZIP = document.getElementById('btnExportZIP');
+  const btnExportPSD = document.getElementById('btnExportPSD');
   const btnReset = document.getElementById('btnReset');
   const debugGuideInfo = document.getElementById('debugGuideInfo');
   const debugToggleBoxes = document.getElementById('debugToggleBoxes');
@@ -866,6 +868,67 @@ src: url("Fonts/Beleren2016-Bold.ttf") format("truetype");
     state.layerOpacity[key] = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
   }
 
+  function getTextOverArtShadowConfig(layerId){
+    if(layerId === 'rarityNumber') return RARITY_NUMBER_SHADOW_CONFIG;
+    if(layerId === 'expansionArtist') return EXPANSION_ARTIST_SHADOW_CONFIG;
+    return null;
+  }
+
+  function getTextOverArtShadowConfigSnapshot(layerId){
+    const cfg = getTextOverArtShadowConfig(layerId);
+    return { ...DEFAULT_TEXT_OVER_ART_SHADOW_CONFIG, ...(cfg || {}) };
+  }
+
+  function setTextOverArtShadowConfigValue(layerId, prop, value){
+    const cfg = getTextOverArtShadowConfig(layerId);
+    if(!cfg) return;
+    if(prop === 'enabled'){
+      cfg.enabled = !!value;
+      return;
+    }
+    if(prop === 'color'){
+      cfg.color = String(value || DEFAULT_TEXT_OVER_ART_SHADOW_CONFIG.color);
+      return;
+    }
+    const n = Number(value);
+    if(!Number.isFinite(n)) return;
+    if(prop === 'opacity') cfg.opacity = Math.max(0, Math.min(1, n));
+    else if(prop === 'distancePx') cfg.distancePx = Math.max(0, Math.min(200, n));
+    else if(prop === 'spreadPercent') cfg.spreadPercent = Math.max(0, Math.min(100, n));
+    else if(prop === 'sizePx') cfg.sizePx = Math.max(0, Math.min(200, n));
+    else if(prop === 'angleDeg') cfg.angleDeg = ((n % 360) + 360) % 360;
+  }
+
+  function buildTextOverArtShadowControlsHtml(layerId){
+    if(layerId !== 'rarityNumber' && layerId !== 'expansionArtist') return '';
+    const cfg = getTextOverArtShadowConfigSnapshot(layerId);
+    const title = layerId === 'rarityNumber' ? 'Rarity/Number shadow' : 'Expansion/Artist shadow';
+    const openAttr = cfg.enabled ? ' open' : '';
+    const prefix = `shadow_${layerId}`;
+    const makeRow = (label, prop, type, min='', max='', step='', value='') => {
+      if(type === 'color'){
+        return `<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:8px"><label class="small muted">${label}</label><input type="color" value="${value}" data-shadow-layer="${layerId}" data-shadow-prop="${prop}" style="width:54px;height:32px;padding:3px;border-radius:8px;background:#061428;border:1px solid rgba(255,255,255,0.06)"></div>`;
+      }
+      return `<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><label class="small muted">${label}</label><input type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-shadow-layer="${layerId}" data-shadow-prop="${prop}" data-shadow-kind="number" style="width:82px;font-size:12px;padding:6px 8px"></div><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-shadow-layer="${layerId}" data-shadow-prop="${prop}" data-shadow-kind="range" style="width:100%;margin-top:6px"></div>`;
+    };
+    return `
+      <details${openAttr} style="margin-top:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;overflow:hidden">
+        <summary style="padding:8px 10px;cursor:pointer;list-style:none;user-select:none;display:flex;justify-content:space-between;gap:12px;align-items:center">
+          <span class="small muted" style="font-weight:700;color:#dfe9f8">${title}</span>
+          <span class="small muted">over art only</span>
+        </summary>
+        <div style="padding:0 10px 10px">
+          <label class="toggle small muted" style="margin-top:8px"><input type="checkbox" data-shadow-layer="${layerId}" data-shadow-prop="enabled" ${cfg.enabled ? 'checked' : ''}> <span>Enable soft drop shadow</span></label>
+          ${makeRow('Color', 'color', 'color', '', '', '', cfg.color)}
+          ${makeRow('Opacity', 'opacity', 'range', '0', '1', '0.01', cfg.opacity)}
+          ${makeRow('Distance (px)', 'distancePx', 'range', '0', '100', '1', cfg.distancePx)}
+          ${makeRow('Spread (%)', 'spreadPercent', 'range', '0', '100', '1', cfg.spreadPercent)}
+          ${makeRow('Size (px)', 'sizePx', 'range', '0', '120', '1', cfg.sizePx)}
+          ${makeRow('Angle', 'angleDeg', 'range', '0', '360', '1', cfg.angleDeg)}
+        </div>
+      </details>`;
+  }
+
   function getGuideBox(key){
     return state?.layout?.guides?.[key] || null;
   }
@@ -984,7 +1047,7 @@ src: url("Fonts/Beleren2016-Bold.ttf") format("truetype");
     }
   });
 
-  let exportLibraryPromises = { jszip: null, fileSaver: null };
+  let exportLibraryPromises = { jszip: null, fileSaver: null, agPsd: null };
 
   function loadScriptOnce(src, globalName){
     if(globalName && typeof window[globalName] !== 'undefined') return Promise.resolve(window[globalName]);
@@ -1030,10 +1093,29 @@ src: url("Fonts/Beleren2016-Bold.ttf") format("truetype");
     return exportLibraryPromises.jszip;
   }
 
+  function ensureAgPsdReady(){
+    if(window.agPsd && typeof window.agPsd.writePsd === 'function') return Promise.resolve(window.agPsd);
+    if(!exportLibraryPromises.agPsd){
+      exportLibraryPromises.agPsd = loadScriptOnce('vendor/ag-psd.bundle.js', 'agPsd').then((agPsdLib)=>{
+        const lib = agPsdLib || window.agPsd;
+        if(!lib || typeof lib.writePsd !== 'function'){
+          throw new Error('ag-psd bundle loaded but writePsd() is unavailable.');
+        }
+        return lib;
+      }).catch(err => {
+        exportLibraryPromises.agPsd = null;
+        throw err;
+      });
+    }
+    return exportLibraryPromises.agPsd;
+  }
+
   async function ensureExportLibrariesReady(options = {}){
     const needZip = options && options.needZip === true;
+    const needPsd = options && options.needPsd === true;
     await ensureFileSaverReady();
     if(needZip) await ensureJSZipReady();
+    if(needPsd) await ensureAgPsdReady();
   }
 
   let state = createInitialState();
@@ -2589,9 +2671,17 @@ artFile.addEventListener('change', async (e)=>{
     return `${rarityLetter}${rarityLetter && collector ? ' ' : ''} ${collector}`.trim();
   }
 
+  function getExpansionArtistNibGlyph(){
+    return '';
+  }
+
   function buildExpansionArtistParts(card){
+    const prefixText = `${(card?.set || '').toUpperCase()} • ${(card?.lang || '').toUpperCase()}`.trim();
+    const symbol = getExpansionArtistNibGlyph();
     return {
-      prefix: `${(card?.set || '').toUpperCase()} • ${(card?.lang || '').toUpperCase()} 🖌 `,
+      prefixText,
+      prefix: `${prefixText}${prefixText ? ' ' : ''}${symbol}${symbol ? ' ' : ''}`.trim(),
+      symbol,
       artist: `${card?.artist || ''}`
     };
   }
@@ -2853,7 +2943,7 @@ artFile.addEventListener('change', async (e)=>{
     const frameType = getCardFrameType(card);
     const colorCode = getOverlayFolderColorCode(card);
     const sizeName = String(sizeKey || 'normal');
-    const sizeCap = sizeName.toUpperCase();
+    const sizeCap = sizeName.charAt(0).toUpperCase() + sizeName.slice(1).toLowerCase();
     return `Overlays/BorderlessAlt/${frameType}/${colorCode}/${colorCode}_${sizeCap}.png`;
   }
 
@@ -2892,7 +2982,7 @@ artFile.addEventListener('change', async (e)=>{
 
     const scryCode = state.scry ? getOverlayFolderColorCode(state.scry) : 'C';
     if(!cardIsLand(state.scry) && scryCode.length > 1){
-      const sizeCap = state.size.toUpperCase();
+      const sizeCap = state.size.charAt(0).toUpperCase() + state.size.slice(1).toLowerCase();
       const fallbackPath = `Overlays/BorderlessAlt/${frameType}/M/M_${sizeCap}.png`;
       debugGuideState.overlayFallbackPath = fallbackPath;
       const img2 = new Image();
@@ -3915,15 +4005,45 @@ async function syncOverlayAndGuides(){
     rulesOffsetXRatio: 0.009,
     rulesOffsetYRatio: 0,
     rulesPostScale: 1,
-    rarityNumberOffsetXRatio: 0.4,
-    rarityNumberOffsetYRatio: -0.059,
-    rarityNumberScale: 0.985,
-    expansionArtistOffsetXRatio: 0.4,
-    expansionArtistOffsetYRatio: -0.02,
-    expansionArtistScale: 1.65
+    rarityNumberOffsetXRatio: 0.429,
+    rarityNumberOffsetYRatio: -0.114,
+    rarityNumberScale: 1,
+    expansionArtistOffsetXRatio: 0.377,
+    expansionArtistOffsetYRatio: -0.128,
+    expansionArtistScale: 1.593
   };
 
   let ROW_POSITION_CONFIG = cloneManaTuningValue(DEFAULT_ROW_POSITION_CONFIG);
+
+  const DEFAULT_EXPANSION_ARTIST_NIB_CONFIG = {
+    scale: 1.12,
+    offsetXRatio: 0.815,
+    offsetYRatio: -0.161,
+    gapAfterRatio: 0.131
+  };
+
+  let EXPANSION_ARTIST_NIB_CONFIG = cloneManaTuningValue(DEFAULT_EXPANSION_ARTIST_NIB_CONFIG);
+
+  const DEFAULT_EXPANSION_ARTIST_NAME_CONFIG = {
+    scale: 1,
+    offsetXRatio: 0.007,
+    offsetYRatio: 0.014
+  };
+
+  let EXPANSION_ARTIST_NAME_CONFIG = cloneManaTuningValue(DEFAULT_EXPANSION_ARTIST_NAME_CONFIG);
+
+  const DEFAULT_TEXT_OVER_ART_SHADOW_CONFIG = {
+    enabled: false,
+    color: '#000000',
+    opacity: 0.62,
+    distancePx: 0,
+    spreadPercent: 5,
+    sizePx: 35,
+    angleDeg: 90
+  };
+
+  let RARITY_NUMBER_SHADOW_CONFIG = cloneManaTuningValue(DEFAULT_TEXT_OVER_ART_SHADOW_CONFIG);
+  let EXPANSION_ARTIST_SHADOW_CONFIG = cloneManaTuningValue(DEFAULT_TEXT_OVER_ART_SHADOW_CONFIG);
 
   const DEFAULT_MANA_PIP_BACKGROUND_COLORS = {
     W: '#fffbd6',
@@ -5131,6 +5251,7 @@ async function syncOverlayAndGuides(){
     }
 
     if(layer.id === 'mainFrame'){
+      drawTextOverArtShadowsToContext(drawCtx);
       drawMainFrameToContext(drawCtx);
       return;
     }
@@ -5361,35 +5482,208 @@ async function syncOverlayAndGuides(){
     return best;
   }
 
-  function fitExpansionArtistFont(drawCtx, prefix, artist, boxW, boxH, minSize, maxSize){
+  function measureExpansionArtistLayout(drawCtx, prefixText, symbol, artist, fontSize){
+    const nibCfg = EXPANSION_ARTIST_NIB_CONFIG || DEFAULT_EXPANSION_ARTIST_NIB_CONFIG;
+    const artistCfg = EXPANSION_ARTIST_NAME_CONFIG || DEFAULT_EXPANSION_ARTIST_NAME_CONFIG;
+    const nibScale = Math.max(0.01, Number.isFinite(nibCfg.scale) ? nibCfg.scale : 1);
+    const artistScale = Math.max(0.01, Number.isFinite(artistCfg.scale) ? artistCfg.scale : 1);
+    const nibFontSize = Math.max(1, fontSize * nibScale);
+    const artistFontSize = Math.max(1, fontSize * artistScale);
+    const nibGapBefore = symbol ? fontSize * 0.08 : 0;
+    const nibGapAfter = symbol ? fontSize * (Number.isFinite(nibCfg.gapAfterRatio) ? nibCfg.gapAfterRatio : DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.gapAfterRatio) : 0;
+
+    drawCtx.save();
+    drawCtx.font = `${fontSize}px GothamMedium`;
+    const prefixWidth = drawCtx.measureText(prefixText || '').width;
+    drawCtx.font = `${nibFontSize}px Mana`;
+    const symbolWidth = symbol ? drawCtx.measureText(symbol).width : 0;
+    drawCtx.font = `${artistFontSize}px BelerenSmallCaps`;
+    const artistWidth = drawCtx.measureText(artist || '').width;
+    drawCtx.restore();
+
+    const height = Math.max(fontSize * 1.18, nibFontSize * 1.05, artistFontSize * 1.18);
+    const totalWidth = prefixWidth + (symbol ? (nibGapBefore + symbolWidth + nibGapAfter) : 0) + artistWidth;
+    return { prefixWidth, symbolWidth, artistWidth, nibFontSize, artistFontSize, nibGapBefore, nibGapAfter, totalWidth, height };
+  }
+
+  function fitExpansionArtistFont(drawCtx, prefixText, symbol, artist, boxW, boxH, minSize, maxSize){
     let lo=minSize, hi=maxSize, best=minSize;
     while(lo<=hi){
       const mid=Math.floor((lo+hi)/2);
-      drawCtx.font = `${mid}px GothamMedium`;
-      const prefixW = drawCtx.measureText(prefix || '').width;
-      drawCtx.font = `${mid}px BelerenSmallCaps`;
-      const artistW = drawCtx.measureText(artist || '').width;
-      const totalW = prefixW + artistW;
-      if(totalW <= boxW && mid*1.18 <= boxH){ best=mid; lo=mid+1; } else { hi=mid-1; }
+      const layout = measureExpansionArtistLayout(drawCtx, prefixText, symbol, artist, mid);
+      if(layout.totalWidth <= boxW && layout.height <= boxH){ best=mid; lo=mid+1; } else { hi=mid-1; }
     }
     return best;
   }
 
-  function drawRarityNumberToContext(drawCtx, L, key='rarityNumber'){
+  function getTextOverArtShadowOffsets(cfg){
+    const distance = Math.max(0, Number(cfg?.distancePx) || 0);
+    const angleDeg = Number.isFinite(Number(cfg?.angleDeg)) ? Number(cfg.angleDeg) : DEFAULT_TEXT_OVER_ART_SHADOW_CONFIG.angleDeg;
+    const rad = angleDeg * (Math.PI / 180);
+    return {
+      x: Math.cos(rad) * distance,
+      y: Math.sin(rad) * distance
+    };
+  }
+
+  function colorWithAlpha(color, opacity){
+    const safeOpacity = Math.max(0, Math.min(1, Number(opacity) || 0));
+    const raw = String(color || '#000000').trim();
+    const hexMatch = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if(hexMatch){
+      let hex = hexMatch[1];
+      if(hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${safeOpacity})`;
+    }
+    return raw;
+  }
+
+  function getTextOverArtShadowSpreadOffsets(cfg){
+    const spreadPercent = Math.max(0, Number(cfg?.spreadPercent) || 0);
+    const sizePx = Math.max(0, Number(cfg?.sizePx) || 0);
+    const radius = (sizePx * spreadPercent) / 100;
+    const offsets = [{ x: 0, y: 0 }];
+    if(radius <= 0.01) return offsets;
+    const sampleCount = 8;
+    for(let i = 0; i < sampleCount; i++){
+      const angle = (Math.PI * 2 * i) / sampleCount;
+      offsets.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+    }
+    return offsets;
+  }
+
+  function drawShadowOnlyPassToContext(drawCtx, cfg, drawCallback){
+    if(!drawCtx || !cfg?.enabled || typeof drawCallback !== 'function') return;
+    const temp = document.createElement('canvas');
+    temp.width = canvas.width;
+    temp.height = canvas.height;
+    const tctx = temp.getContext('2d');
+    const shadowOffsets = getTextOverArtShadowOffsets(cfg);
+    const spreadOffsets = getTextOverArtShadowSpreadOffsets(cfg);
+    const shadowColor = colorWithAlpha(cfg.color || '#000000', cfg.opacity);
+    const shadowBlur = Math.max(0, Number(cfg.sizePx) || 0);
+
+    tctx.save();
+    tctx.shadowColor = shadowColor;
+    tctx.shadowBlur = shadowBlur;
+    tctx.shadowOffsetX = shadowOffsets.x;
+    tctx.shadowOffsetY = shadowOffsets.y;
+    tctx.fillStyle = cfg.color || '#000000';
+    for(const spread of spreadOffsets){
+      tctx.save();
+      tctx.translate(spread.x, spread.y);
+      drawCallback(tctx);
+      tctx.restore();
+    }
+    tctx.restore();
+
+    tctx.save();
+    tctx.globalCompositeOperation = 'destination-out';
+    tctx.fillStyle = '#000000';
+    for(const spread of spreadOffsets){
+      tctx.save();
+      tctx.translate(spread.x, spread.y);
+      drawCallback(tctx);
+      tctx.restore();
+    }
+    tctx.restore();
+
+    drawCtx.drawImage(temp, 0, 0);
+  }
+
+  function getRarityNumberRenderData(drawCtx, L, key='rarityNumber'){
     const box = getGuideBox(key) || { x: 48, y: 48, w: canvas.width - 96, h: 200 };
     const textValue = L.text || '';
-    if(!textValue || box.w <= 2 || box.h <= 2) return;
+    if(!textValue || box.w <= 2 || box.h <= 2) return null;
     const cfg = ROW_POSITION_CONFIG || DEFAULT_ROW_POSITION_CONFIG;
     const scaleRatio = Math.max(0.01, Number.isFinite(cfg.rarityNumberScale) ? cfg.rarityNumberScale : 1);
-    const best = Math.max(8, fitSingleLineFont(drawCtx, textValue, box.w, box.h, 8, 160, 'GothamMedium') * scaleRatio);
-    L.fontSize = best;
+    const fontSize = Math.max(8, fitSingleLineFont(drawCtx, textValue, box.w, box.h, 8, 160, 'GothamMedium') * scaleRatio);
     const offset = getRowPositionPixelOffset(box, cfg.rarityNumberOffsetXRatio, cfg.rarityNumberOffsetYRatio);
+    const y = box.y + Math.max(0, (box.h - fontSize * 1.18) / 2) + offset.y;
+    return { box, textValue, fontSize, x: box.x + offset.x, y };
+  }
+
+  function drawRarityNumberShadowToContext(drawCtx, L, key='rarityNumber'){
+    const cfg = getTextOverArtShadowConfigSnapshot(key);
+    if(!cfg.enabled || !L || !isLayerVisible(key)) return;
+    const renderData = getRarityNumberRenderData(drawCtx, L, key);
+    if(!renderData) return;
+    drawShadowOnlyPassToContext(drawCtx, cfg, (shadowCtx)=>{
+      shadowCtx.save();
+      shadowCtx.textBaseline = 'top';
+      shadowCtx.font = `${renderData.fontSize}px GothamMedium`;
+      shadowCtx.fillText(renderData.textValue, renderData.x, renderData.y);
+      shadowCtx.restore();
+    });
+  }
+
+  function getExpansionArtistRenderData(drawCtx, L, key='expansionArtist'){
+    const box = getGuideBox(key) || { x: 48, y: 48, w: canvas.width - 96, h: 200 };
+    const parts = buildExpansionArtistParts(state.scry || {});
+    const prefixText = parts.prefixText || '';
+    const symbol = parts.symbol || '';
+    const artist = parts.artist || '';
+    if((!prefixText && !symbol && !artist) || box.w <= 2 || box.h <= 2) return null;
+    const cfg = ROW_POSITION_CONFIG || DEFAULT_ROW_POSITION_CONFIG;
+    const nibCfg = EXPANSION_ARTIST_NIB_CONFIG || DEFAULT_EXPANSION_ARTIST_NIB_CONFIG;
+    const artistCfg = EXPANSION_ARTIST_NAME_CONFIG || DEFAULT_EXPANSION_ARTIST_NAME_CONFIG;
+    const scaleRatio = Math.max(0.01, Number.isFinite(cfg.expansionArtistScale) ? cfg.expansionArtistScale : 1);
+    const fontSize = Math.max(8, fitExpansionArtistFont(drawCtx, prefixText, symbol, artist, box.w, box.h, 8, 160) * scaleRatio);
+    const layout = measureExpansionArtistLayout(drawCtx, prefixText, symbol, artist, fontSize);
+    const offset = getRowPositionPixelOffset(box, cfg.expansionArtistOffsetXRatio, cfg.expansionArtistOffsetYRatio);
+    const baseY = box.y + Math.max(0, (box.h - layout.height)/2) + offset.y;
+    let x = box.x + offset.x;
+    const prefixX = x;
+    x += layout.prefixWidth;
+    let nibX = null;
+    let nibY = null;
+    if(symbol){
+      nibX = x + layout.nibGapBefore + (box.h * (Number.isFinite(nibCfg.offsetXRatio) ? nibCfg.offsetXRatio : 0));
+      nibY = baseY + Math.max(0, (layout.height - layout.nibFontSize * 1.05) / 2) + (box.h * (Number.isFinite(nibCfg.offsetYRatio) ? nibCfg.offsetYRatio : 0));
+      x = nibX + layout.symbolWidth + layout.nibGapAfter;
+    }
+    const artistX = x + (box.h * (Number.isFinite(artistCfg.offsetXRatio) ? artistCfg.offsetXRatio : 0));
+    const artistY = baseY + Math.max(0, (layout.height - layout.artistFontSize * 1.18) / 2) + (box.h * (Number.isFinite(artistCfg.offsetYRatio) ? artistCfg.offsetYRatio : 0));
+    return { box, prefixText, symbol, artist, fontSize, layout, prefixX, baseY, nibX, nibY, artistX, artistY };
+  }
+
+  function drawExpansionArtistShadowToContext(drawCtx, L, key='expansionArtist'){
+    const cfg = getTextOverArtShadowConfigSnapshot(key);
+    if(!cfg.enabled || !L || !isLayerVisible(key)) return;
+    const renderData = getExpansionArtistRenderData(drawCtx, L, key);
+    if(!renderData) return;
+    drawShadowOnlyPassToContext(drawCtx, cfg, (shadowCtx)=>{
+      shadowCtx.save();
+      shadowCtx.textBaseline = 'top';
+      shadowCtx.font = `${renderData.fontSize}px GothamMedium`;
+      shadowCtx.fillText(renderData.prefixText, renderData.prefixX, renderData.baseY);
+      if(renderData.symbol){
+        shadowCtx.font = `${renderData.layout.nibFontSize}px Mana`;
+        shadowCtx.fillText(renderData.symbol, renderData.nibX, renderData.nibY);
+      }
+      shadowCtx.font = `${renderData.layout.artistFontSize}px BelerenSmallCaps`;
+      shadowCtx.fillText(renderData.artist, renderData.artistX, renderData.artistY);
+      shadowCtx.restore();
+    });
+  }
+
+  function drawTextOverArtShadowsToContext(drawCtx){
+    drawRarityNumberShadowToContext(drawCtx, getLayerModel('rarityNumber'), 'rarityNumber');
+    drawExpansionArtistShadowToContext(drawCtx, getLayerModel('expansionArtist'), 'expansionArtist');
+  }
+
+  function drawRarityNumberToContext(drawCtx, L, key='rarityNumber'){
+    const renderData = getRarityNumberRenderData(drawCtx, L, key);
+    if(!renderData) return;
+    L.fontSize = renderData.fontSize;
     drawCtx.save();
     drawCtx.textBaseline = 'top';
     drawCtx.fillStyle = '#fff';
-    drawCtx.font = `${best}px GothamMedium`;
-    const y = box.y + Math.max(0, (box.h - best*1.18)/2) + offset.y;
-    drawCtx.fillText(textValue, box.x + offset.x, y);
+    drawCtx.font = `${renderData.fontSize}px GothamMedium`;
+    drawCtx.fillText(renderData.textValue, renderData.x, renderData.y);
     drawCtx.restore();
   }
 
@@ -5438,26 +5732,20 @@ async function syncOverlayAndGuides(){
   }
 
   function drawExpansionArtistToContext(drawCtx, L, key='expansionArtist'){
-    const box = getGuideBox(key) || { x: 48, y: 48, w: canvas.width - 96, h: 200 };
-    const parts = buildExpansionArtistParts(state.scry || {});
-    const prefix = parts.prefix || '';
-    const artist = parts.artist || '';
-    if((!prefix && !artist) || box.w <= 2 || box.h <= 2) return;
-    const cfg = ROW_POSITION_CONFIG || DEFAULT_ROW_POSITION_CONFIG;
-    const scaleRatio = Math.max(0.01, Number.isFinite(cfg.expansionArtistScale) ? cfg.expansionArtistScale : 1);
-    const best = Math.max(8, fitExpansionArtistFont(drawCtx, prefix, artist, box.w, box.h, 8, 160) * scaleRatio);
-    L.fontSize = best;
-    const offset = getRowPositionPixelOffset(box, cfg.expansionArtistOffsetXRatio, cfg.expansionArtistOffsetYRatio);
+    const renderData = getExpansionArtistRenderData(drawCtx, L, key);
+    if(!renderData) return;
+    L.fontSize = renderData.fontSize;
     drawCtx.save();
     drawCtx.textBaseline = 'top';
     drawCtx.fillStyle = '#fff';
-    let x = box.x + offset.x;
-    const y = box.y + Math.max(0, (box.h - best*1.18)/2) + offset.y;
-    drawCtx.font = `${best}px GothamMedium`;
-    drawCtx.fillText(prefix, x, y);
-    x += drawCtx.measureText(prefix).width;
-    drawCtx.font = `${best}px BelerenSmallCaps`;
-    drawCtx.fillText(artist, x, y);
+    drawCtx.font = `${renderData.fontSize}px GothamMedium`;
+    drawCtx.fillText(renderData.prefixText, renderData.prefixX, renderData.baseY);
+    if(renderData.symbol){
+      drawCtx.font = `${renderData.layout.nibFontSize}px Mana`;
+      drawCtx.fillText(renderData.symbol, renderData.nibX, renderData.nibY);
+    }
+    drawCtx.font = `${renderData.layout.artistFontSize}px BelerenSmallCaps`;
+    drawCtx.fillText(renderData.artist, renderData.artistX, renderData.artistY);
     drawCtx.restore();
   }
 
@@ -6888,13 +7176,28 @@ async function syncOverlayAndGuides(){
             </div>
           `;
         } else {
-          row.innerHTML = `
-            <div style='min-width:0;flex:1'>
-              <div style='font-size:13px;font-weight:600'>${escapeHtml(getLayerLabel(layer.id))}</div>
-              <div class='small muted' style='margin-top:4px'>${kind} • z ${Math.round(layer.zIndex)}</div>
-            </div>
-            <div style='white-space:nowrap'><label class='small muted'>visible</label> <input type='checkbox' data-key='${layer.id}' ${visible ? 'checked' : ''}></div>
-          `;
+          const extraControls = buildTextOverArtShadowControlsHtml(layer.id);
+          if(extraControls){
+            row.style.display = 'block';
+            row.innerHTML = `
+              <div style='display:flex;justify-content:space-between;gap:10px;align-items:flex-start'>
+                <div style='min-width:0;flex:1'>
+                  <div style='font-size:13px;font-weight:600'>${escapeHtml(getLayerLabel(layer.id))}</div>
+                  <div class='small muted' style='margin-top:4px'>${kind} • z ${Math.round(layer.zIndex)}</div>
+                </div>
+                <div style='white-space:nowrap'><label class='small muted'>visible</label> <input type='checkbox' data-key='${layer.id}' ${visible ? 'checked' : ''}></div>
+              </div>
+              ${extraControls}
+            `;
+          } else {
+            row.innerHTML = `
+              <div style='min-width:0;flex:1'>
+                <div style='font-size:13px;font-weight:600'>${escapeHtml(getLayerLabel(layer.id))}</div>
+                <div class='small muted' style='margin-top:4px'>${kind} • z ${Math.round(layer.zIndex)}</div>
+              </div>
+              <div style='white-space:nowrap'><label class='small muted'>visible</label> <input type='checkbox' data-key='${layer.id}' ${visible ? 'checked' : ''}></div>
+            `;
+          }
         }
       }
 
@@ -6931,6 +7234,30 @@ async function syncOverlayAndGuides(){
         if(readout) readout.textContent = `${Math.round(getBuiltInLayerOpacity(id) * 100)}%`;
         await drawCanvas();
       };
+    });
+    layersList.querySelectorAll('input[data-shadow-layer], input[data-shadow-layer][type=color]').forEach(input => {
+      const apply = async (target) => {
+        const layerId = target.dataset.shadowLayer;
+        const prop = target.dataset.shadowProp;
+        if(!layerId || !prop) return;
+        let value;
+        if(target.type === 'checkbox') value = !!target.checked;
+        else if(target.type === 'color') value = target.value;
+        else value = Number(target.value);
+        setTextOverArtShadowConfigValue(layerId, prop, value);
+
+        if(target.dataset.shadowKind){
+          const peerSelector = `input[data-shadow-layer='${layerId}'][data-shadow-prop='${prop}'][data-shadow-kind='${target.dataset.shadowKind === 'range' ? 'number' : 'range'}']`;
+          const peer = layersList.querySelector(peerSelector);
+          if(peer) peer.value = target.value;
+        }
+
+        await drawCanvas();
+        updateLayersList();
+      };
+      const handler = async (e) => { await apply(e.currentTarget); };
+      input.oninput = handler;
+      input.onchange = handler;
     });
     layersList.querySelectorAll('input[data-custom-rename]').forEach(input => {
       const commit = async (target) => {
@@ -7083,6 +7410,52 @@ async function syncOverlayAndGuides(){
     toggleNB2Credit.addEventListener('change', ()=>{ if(state.layerVisibility) state.layerVisibility.NB2Credit = !!toggleNB2Credit.checked; drawCanvas(); });
   }
 
+  function createPsdLayerFromCanvas(name, layerCanvas){
+    return {
+      name: String(name || 'Layer'),
+      canvas: layerCanvas,
+      hidden: false,
+      opacity: 1,
+      blendMode: 'normal'
+    };
+  }
+
+  async function buildRasterPsdDocument(){
+    await ensureAllAssetsReady();
+    syncLayerVisibilityFromState();
+
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = canvas.width;
+    finalCanvas.height = canvas.height;
+    const finalCtx = finalCanvas.getContext('2d');
+    finalCtx.clearRect(0,0,finalCanvas.width,finalCanvas.height);
+    renderLayers(finalCtx, {
+      includeVisualOnly: false,
+      includeDebug: false
+    });
+
+    const renderableLayers = getRenderableLayers({ includeVisualOnly:false, includeDebug:false });
+    const psdChildren = [];
+    for(const layer of renderableLayers){
+      const layerCanvas = document.createElement('canvas');
+      layerCanvas.width = canvas.width;
+      layerCanvas.height = canvas.height;
+      const layerCtx = layerCanvas.getContext('2d');
+      layerCtx.clearRect(0,0,layerCanvas.width,layerCanvas.height);
+      drawLayer(layerCtx, layer);
+      psdChildren.push(createPsdLayerFromCanvas(getLayerLabel(layer.id), layerCanvas));
+    }
+
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      canvas: finalCanvas,
+      children: psdChildren,
+      colorMode: 3,
+      bitsPerChannel: 8
+    };
+  }
+
   // Export PNG
   btnExportPNG.addEventListener('click', async ()=>{
     await withBusy('Exporting PNG…', async ()=>{
@@ -7148,6 +7521,17 @@ async function syncOverlayAndGuides(){
       zip.file('metadata.json', JSON.stringify(metadata, null, 2));
       const zblob = await zip.generateAsync({type:'blob'});
       saveAs(zblob, 'mtg-card-layers.zip');
+    });
+  });
+
+  // Export raster PSD
+  btnExportPSD.addEventListener('click', async ()=>{
+    await withBusy('Exporting PSD…', async ()=>{
+      await ensureExportLibrariesReady({ needPsd:true });
+      const psdDoc = await buildRasterPsdDocument();
+      const psdBuffer = window.agPsd.writePsd(psdDoc);
+      const psdBlob = new Blob([psdBuffer], { type: 'image/vnd.adobe.photoshop' });
+      saveAs(psdBlob, 'mtg-card-layers.psd');
     });
   });
 
@@ -8101,6 +8485,500 @@ async function syncOverlayAndGuides(){
     return { details, grid };
   }
 
+
+  function createConfigTransferCard(){
+    const card = document.createElement('div');
+    card.className = 'modernCard miscWide';
+    card.style.padding = '14px';
+    card.innerHTML = `
+      <div class="stepHeader" style="margin-bottom:12px">
+        <div class="stepTitle" style="font-size:16px">Configuration import / export</div>
+        <div class="stepSubtitle">Save your current tuning as a reusable config file, or import one to restore slider values, transparency, and custom layers.</div>
+      </div>
+    `;
+
+    const row = document.createElement('div');
+    row.className = 'downloadButtonRow';
+    row.style.justifyContent = 'flex-start';
+    row.style.gap = '10px';
+
+    const exportBtn = document.createElement('button');
+    exportBtn.type = 'button';
+    exportBtn.id = 'btnExportConfig';
+    exportBtn.textContent = 'Export config';
+
+    const importBtn = document.createElement('button');
+    importBtn.type = 'button';
+    importBtn.id = 'btnImportConfig';
+    importBtn.textContent = 'Import config';
+    importBtn.className = 'secondaryButton';
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = 'configImportFile';
+    fileInput.accept = '.json,application/json';
+    fileInput.style.display = 'none';
+
+    const note = document.createElement('div');
+    note.className = 'miniCard';
+    note.style.marginTop = '12px';
+    note.innerHTML = 'The config file stores current tuning values, layer visibility / transparency, and any custom full-frame PNG layers as embedded base64 image data.';
+
+    const status = document.createElement('div');
+    status.id = 'configTransferStatus';
+    status.className = 'note';
+    status.style.marginTop = '10px';
+    status.textContent = 'No config file imported yet.';
+
+    row.append(exportBtn, importBtn, fileInput);
+    card.append(row, note, status);
+    return card;
+  }
+
+  function buildExpansionArtistNibTuningCard(){
+    const card = document.createElement('div');
+    card.className = 'modernCard miscWide';
+    card.style.padding = '14px';
+    card.innerHTML = `
+      <div class="stepHeader" style="margin-bottom:12px">
+        <div class="stepTitle" style="font-size:16px">Artist nib symbol tuning</div>
+        <div class="stepSubtitle">Fine tune the Mana font nib icon used in the Expansion/Artist row.</div>
+      </div>
+    `;
+    const grid = document.createElement('div');
+    grid.className = 'stepGridOne';
+
+    function makeRow(label, hint, rangeId, numberId, min, max, step){
+      const range = document.createElement('input');
+      range.id = rangeId;
+      range.type = 'range';
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
+      const number = document.createElement('input');
+      number.id = numberId;
+      number.type = 'number';
+      number.min = String(min);
+      number.max = String(max);
+      number.step = String(step);
+      return createModernRangeBlock(label, hint, range, number);
+    }
+
+    grid.append(
+      makeRow('Nib scale', 'scales the Mana font nib relative to the Expansion/Artist text', 'expansionArtistNibScaleRange', 'expansionArtistNibScaleNumber', 0.25, 3, 0.001),
+      makeRow('Nib offset X', 'horizontal nudge for the nib symbol only', 'expansionArtistNibOffsetXRatioRange', 'expansionArtistNibOffsetXRatioNumber', -0.5, 1.0, 0.001),
+      makeRow('Nib offset Y', 'vertical nudge for the nib symbol only', 'expansionArtistNibOffsetYRatioRange', 'expansionArtistNibOffsetYRatioNumber', -0.5, 0.5, 0.001),
+      makeRow('Nib → artist gap', 'space after the nib before the artist name starts', 'expansionArtistNibGapAfterRatioRange', 'expansionArtistNibGapAfterRatioNumber', 0, 0.6, 0.001)
+    );
+    card.appendChild(grid);
+    return card;
+  }
+
+  function buildExpansionArtistNameTuningCard(){
+    const card = document.createElement('div');
+    card.className = 'modernCard miscWide';
+    card.style.padding = '14px';
+    card.innerHTML = `
+      <div class="stepHeader" style="margin-bottom:12px">
+        <div class="stepTitle" style="font-size:16px">Artist name tuning</div>
+        <div class="stepSubtitle">Fine tune the artist name text in the Expansion/Artist row.</div>
+      </div>
+    `;
+    const grid = document.createElement('div');
+    grid.className = 'stepGridOne';
+
+    function makeRow(label, hint, rangeId, numberId, min, max, step){
+      const range = document.createElement('input');
+      range.id = rangeId;
+      range.type = 'range';
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
+      const number = document.createElement('input');
+      number.id = numberId;
+      number.type = 'number';
+      number.min = String(min);
+      number.max = String(max);
+      number.step = String(step);
+      return createModernRangeBlock(label, hint, range, number);
+    }
+
+    grid.append(
+      makeRow('Artist name scale', 'scales the artist name independently of the prefix text', 'expansionArtistNameScaleRange', 'expansionArtistNameScaleNumber', 0.25, 3, 0.001),
+      makeRow('Artist name offset X', 'horizontal nudge for the artist name only', 'expansionArtistNameOffsetXRatioRange', 'expansionArtistNameOffsetXRatioNumber', -0.5, 0.5, 0.001),
+      makeRow('Artist name offset Y', 'vertical nudge for the artist name only', 'expansionArtistNameOffsetYRatioRange', 'expansionArtistNameOffsetYRatioNumber', -0.5, 0.5, 0.001)
+    );
+    card.appendChild(grid);
+    return card;
+  }
+
+  function bindExpansionArtistNameControls(){
+    const defs = [
+      { baseId: 'expansionArtistNameScale', min: 0.25, max: 3, step: 0.001, get: ()=>EXPANSION_ARTIST_NAME_CONFIG.scale ?? DEFAULT_EXPANSION_ARTIST_NAME_CONFIG.scale, set: v=>{ EXPANSION_ARTIST_NAME_CONFIG.scale = v; } },
+      { baseId: 'expansionArtistNameOffsetXRatio', min: -0.5, max: 0.5, step: 0.001, get: ()=>EXPANSION_ARTIST_NAME_CONFIG.offsetXRatio ?? DEFAULT_EXPANSION_ARTIST_NAME_CONFIG.offsetXRatio, set: v=>{ EXPANSION_ARTIST_NAME_CONFIG.offsetXRatio = v; } },
+      { baseId: 'expansionArtistNameOffsetYRatio', min: -0.5, max: 0.5, step: 0.001, get: ()=>EXPANSION_ARTIST_NAME_CONFIG.offsetYRatio ?? DEFAULT_EXPANSION_ARTIST_NAME_CONFIG.offsetYRatio, set: v=>{ EXPANSION_ARTIST_NAME_CONFIG.offsetYRatio = v; } }
+    ];
+
+    defs.forEach(def => {
+      const range = document.getElementById(`${def.baseId}Range`);
+      const number = document.getElementById(`${def.baseId}Number`);
+      if(!range || !number) return;
+      range.min = number.min = String(def.min);
+      range.max = number.max = String(def.max);
+      range.step = number.step = String(def.step);
+      const apply = (value)=>{
+        const n = Number(value);
+        const clamped = Math.max(def.min, Math.min(def.max, Number.isFinite(n) ? n : def.get()));
+        def.set(clamped);
+        range.value = String(clamped);
+        number.value = String(clamped);
+        drawCanvas();
+      };
+      range.addEventListener('input', ()=> apply(range.value));
+      number.addEventListener('input', ()=> apply(number.value));
+    });
+  }
+
+  function refreshExpansionArtistNameControls(){
+    const defs = [
+      { baseId: 'expansionArtistNameScale', value: EXPANSION_ARTIST_NAME_CONFIG.scale ?? DEFAULT_EXPANSION_ARTIST_NAME_CONFIG.scale },
+      { baseId: 'expansionArtistNameOffsetXRatio', value: EXPANSION_ARTIST_NAME_CONFIG.offsetXRatio ?? DEFAULT_EXPANSION_ARTIST_NAME_CONFIG.offsetXRatio },
+      { baseId: 'expansionArtistNameOffsetYRatio', value: EXPANSION_ARTIST_NAME_CONFIG.offsetYRatio ?? DEFAULT_EXPANSION_ARTIST_NAME_CONFIG.offsetYRatio }
+    ];
+    defs.forEach(def => {
+      const range = document.getElementById(`${def.baseId}Range`);
+      const number = document.getElementById(`${def.baseId}Number`);
+      if(range) range.value = String(def.value);
+      if(number) number.value = String(def.value);
+    });
+  }
+
+  function bindExpansionArtistNibControls(){
+    const defs = [
+      { baseId: 'expansionArtistNibScale', min: 0.25, max: 3, step: 0.001, get: ()=>EXPANSION_ARTIST_NIB_CONFIG.scale ?? DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.scale, set: v=>{ EXPANSION_ARTIST_NIB_CONFIG.scale = v; } },
+      { baseId: 'expansionArtistNibOffsetXRatio', min: -0.5, max: 1.0, step: 0.001, get: ()=>EXPANSION_ARTIST_NIB_CONFIG.offsetXRatio ?? DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.offsetXRatio, set: v=>{ EXPANSION_ARTIST_NIB_CONFIG.offsetXRatio = v; } },
+      { baseId: 'expansionArtistNibOffsetYRatio', min: -0.5, max: 0.5, step: 0.001, get: ()=>EXPANSION_ARTIST_NIB_CONFIG.offsetYRatio ?? DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.offsetYRatio, set: v=>{ EXPANSION_ARTIST_NIB_CONFIG.offsetYRatio = v; } },
+      { baseId: 'expansionArtistNibGapAfterRatio', min: 0, max: 0.6, step: 0.001, get: ()=>EXPANSION_ARTIST_NIB_CONFIG.gapAfterRatio ?? DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.gapAfterRatio, set: v=>{ EXPANSION_ARTIST_NIB_CONFIG.gapAfterRatio = v; } }
+    ];
+
+    defs.forEach(def => {
+      const range = document.getElementById(`${def.baseId}Range`);
+      const number = document.getElementById(`${def.baseId}Number`);
+      if(!range || !number) return;
+      range.min = number.min = String(def.min);
+      range.max = number.max = String(def.max);
+      range.step = number.step = String(def.step);
+      const apply = (value)=>{
+        const n = Number(value);
+        const clamped = Math.max(def.min, Math.min(def.max, Number.isFinite(n) ? n : def.get()));
+        def.set(clamped);
+        range.value = String(clamped);
+        number.value = String(clamped);
+        drawCanvas();
+      };
+      range.addEventListener('input', ()=> apply(range.value));
+      number.addEventListener('input', ()=> apply(number.value));
+    });
+  }
+
+  function refreshExpansionArtistNibControls(){
+    const defs = [
+      { baseId: 'expansionArtistNibScale', value: EXPANSION_ARTIST_NIB_CONFIG.scale ?? DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.scale },
+      { baseId: 'expansionArtistNibOffsetXRatio', value: EXPANSION_ARTIST_NIB_CONFIG.offsetXRatio ?? DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.offsetXRatio },
+      { baseId: 'expansionArtistNibOffsetYRatio', value: EXPANSION_ARTIST_NIB_CONFIG.offsetYRatio ?? DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.offsetYRatio },
+      { baseId: 'expansionArtistNibGapAfterRatio', value: EXPANSION_ARTIST_NIB_CONFIG.gapAfterRatio ?? DEFAULT_EXPANSION_ARTIST_NIB_CONFIG.gapAfterRatio }
+    ];
+    defs.forEach(def => {
+      const range = document.getElementById(`${def.baseId}Range`);
+      const number = document.getElementById(`${def.baseId}Number`);
+      if(range) range.value = String(def.value);
+      if(number) number.value = String(def.value);
+    });
+  }
+
+
+  function updateConfigTransferStatus(message, isError = false){
+    const status = document.getElementById('configTransferStatus');
+    if(!status) return;
+    status.textContent = String(message || '');
+    status.style.color = isError ? '#ff9e9e' : '#9bb7ff';
+  }
+
+  function clonePlain(value){
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+
+  function mergeConfigWithDefaults(defaultValue, incomingValue){
+    if(incomingValue === undefined) return clonePlain(defaultValue);
+    if(Array.isArray(defaultValue)){
+      return Array.isArray(incomingValue) ? clonePlain(incomingValue) : clonePlain(defaultValue);
+    }
+    if(defaultValue && typeof defaultValue === 'object'){
+      const result = clonePlain(defaultValue) || {};
+      if(incomingValue && typeof incomingValue === 'object' && !Array.isArray(incomingValue)){
+        for(const [key, value] of Object.entries(incomingValue)){
+          if(Object.prototype.hasOwnProperty.call(defaultValue, key)) result[key] = mergeConfigWithDefaults(defaultValue[key], value);
+          else result[key] = clonePlain(value);
+        }
+      }
+      return result;
+    }
+    return clonePlain(incomingValue);
+  }
+
+  async function imageToDataUrlForConfig(img){
+    if(!img) return null;
+    const src = String(img.src || '');
+    if(/^data:image\//i.test(src)) return src;
+    const width = img.naturalWidth || img.width || canvas.width;
+    const height = img.naturalHeight || img.height || canvas.height;
+    const temp = document.createElement('canvas');
+    temp.width = width;
+    temp.height = height;
+    const tctx = temp.getContext('2d');
+    tctx.drawImage(img, 0, 0, width, height);
+    return temp.toDataURL('image/png');
+  }
+
+  async function buildConfigurationSnapshot(){
+    syncLayerVisibilityFromState();
+    const customLayers = [];
+    const orderedCustomLayers = (state.customLayers || []).slice().sort((a,b)=> (a.zIndex || 0) - (b.zIndex || 0));
+    for(const layer of orderedCustomLayers){
+      const asset = getCustomLayerAsset(layer);
+      customLayers.push({
+        name: layer.name || layer.id,
+        visible: layer.visible !== false,
+        opacity: Number.isFinite(Number(layer.opacity)) ? Number(layer.opacity) : 1,
+        zIndex: Number.isFinite(Number(layer.zIndex)) ? Number(layer.zIndex) : 0,
+        dataUrl: await imageToDataUrlForConfig(asset)
+      });
+    }
+
+    const builtInVisibility = {};
+    const textLayerVisibility = {};
+    for(const [key, value] of Object.entries(state.layerVisibility || {})){
+      if(TEXT_LAYER_KEYS.has(key)) textLayerVisibility[key] = value !== false;
+      else if(!isCustomLayerId(key)) builtInVisibility[key] = value !== false;
+    }
+
+    return {
+      app: 'PoliteFrog Borderless Builder',
+      type: 'builder-config',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings: {
+        includeFlavor: !!state.includeFlavor,
+        includeReminderText: !!state.includeReminderText,
+        size: state.size || 'tall',
+        rulesMaxFontSize: state.rulesMaxFontSize,
+        rulesParagraphSpacingScale: state.rulesParagraphSpacingScale,
+        flavorLineSpacingScale: state.flavorLineSpacingScale,
+        flavorGapScale: state.flavorGapScale,
+        artTransform: clonePlain(getArtTransformState()),
+        setSymbolOverrides: {
+          setCode: normalizeSetCodeInput(setSymbolSetCode?.value || ''),
+          rarityCode: normalizeRarityCodeInput(setSymbolRarity?.value || '')
+        },
+        builtInVisibility,
+        textLayerVisibility,
+        layerOpacity: clonePlain(state.layerOpacity || {}),
+        manaRenderConfig: clonePlain(MANA_RENDER_CONFIG),
+        ptRenderConfig: clonePlain(PT_RENDER_CONFIG),
+        rowPositionConfig: clonePlain(ROW_POSITION_CONFIG),
+        expansionArtistNibConfig: clonePlain(EXPANSION_ARTIST_NIB_CONFIG),
+        expansionArtistNameConfig: clonePlain(EXPANSION_ARTIST_NAME_CONFIG),
+        rarityNumberShadowConfig: clonePlain(RARITY_NUMBER_SHADOW_CONFIG),
+        expansionArtistShadowConfig: clonePlain(EXPANSION_ARTIST_SHADOW_CONFIG),
+        manaPipBackgroundColors: clonePlain(MANA_PIP_BACKGROUND_COLORS),
+        manaTokenAdjustments: clonePlain(MANA_TOKEN_ADJUSTMENTS)
+      },
+      customLayers
+    };
+  }
+
+  function triggerConfigDownload(filename, blob){
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(()=> safeRevokeObjectUrl(href), 0);
+  }
+
+  async function exportCurrentConfiguration(){
+    await withBusy('Exporting configuration…', async ()=>{
+      const payload = await buildConfigurationSnapshot();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+      triggerConfigDownload('borderless-builder-config.json', blob);
+      updateConfigTransferStatus(`Configuration exported at ${new Date().toLocaleTimeString()}.`, false);
+    });
+  }
+
+  async function loadConfigImageFromDataUrl(dataUrl){
+    if(!dataUrl) return null;
+    const img = new Image();
+    img.src = String(dataUrl);
+    await imageLoaded(img);
+    return (img.complete && img.naturalWidth > 0) ? img : null;
+  }
+
+  async function applyImportedConfiguration(configPayload){
+    const settings = configPayload?.settings || {};
+
+    if(typeof settings.includeFlavor === 'boolean') state.includeFlavor = settings.includeFlavor;
+    if(typeof settings.includeReminderText === 'boolean') state.includeReminderText = settings.includeReminderText;
+    if(typeof settings.size === 'string' && ['short','medium','normal','tall'].includes(settings.size)) state.size = settings.size;
+    if(settings.rulesMaxFontSize != null) state.rulesMaxFontSize = clampRulesMaxFontSize(settings.rulesMaxFontSize);
+    if(settings.rulesParagraphSpacingScale != null) state.rulesParagraphSpacingScale = clampRulesParagraphSpacingScale(settings.rulesParagraphSpacingScale);
+    if(settings.flavorLineSpacingScale != null) state.flavorLineSpacingScale = clampFlavorLineSpacingScale(settings.flavorLineSpacingScale);
+    if(settings.flavorGapScale != null) state.flavorGapScale = clampFlavorGapScale(settings.flavorGapScale);
+    if(settings.artTransform && typeof settings.artTransform === 'object'){
+      const art = getArtTransformState();
+      art.scale = Math.max(0.1, Number(settings.artTransform.scale) || 1);
+      art.offsetXRatio = Number(settings.artTransform.offsetXRatio) || 0;
+      art.offsetYRatio = Number(settings.artTransform.offsetYRatio) || 0;
+    }
+
+    MANA_RENDER_CONFIG = mergeConfigWithDefaults(DEFAULT_MANA_RENDER_CONFIG, settings.manaRenderConfig);
+    PT_RENDER_CONFIG = mergeConfigWithDefaults(DEFAULT_PT_RENDER_CONFIG, settings.ptRenderConfig);
+    ROW_POSITION_CONFIG = mergeConfigWithDefaults(DEFAULT_ROW_POSITION_CONFIG, settings.rowPositionConfig);
+    EXPANSION_ARTIST_NIB_CONFIG = mergeConfigWithDefaults(DEFAULT_EXPANSION_ARTIST_NIB_CONFIG, settings.expansionArtistNibConfig);
+    EXPANSION_ARTIST_NAME_CONFIG = mergeConfigWithDefaults(DEFAULT_EXPANSION_ARTIST_NAME_CONFIG, settings.expansionArtistNameConfig);
+    RARITY_NUMBER_SHADOW_CONFIG = mergeConfigWithDefaults(DEFAULT_TEXT_OVER_ART_SHADOW_CONFIG, settings.rarityNumberShadowConfig);
+    EXPANSION_ARTIST_SHADOW_CONFIG = mergeConfigWithDefaults(DEFAULT_TEXT_OVER_ART_SHADOW_CONFIG, settings.expansionArtistShadowConfig);
+    MANA_PIP_BACKGROUND_COLORS = mergeConfigWithDefaults(DEFAULT_MANA_PIP_BACKGROUND_COLORS, settings.manaPipBackgroundColors);
+    MANA_TOKEN_ADJUSTMENTS = mergeConfigWithDefaults(DEFAULT_MANA_TOKEN_ADJUSTMENTS, settings.manaTokenAdjustments);
+
+    state.layerOpacity = mergeConfigWithDefaults({ cardBorder: 0.5 }, settings.layerOpacity || state.layerOpacity || {});
+
+    const defaults = createDefaultLayerVisibility(state);
+    state.layerVisibility = { ...defaults };
+    if(settings.builtInLayerVisibility && typeof settings.builtInLayerVisibility === 'object'){
+      for(const [key, value] of Object.entries(settings.builtInLayerVisibility)){
+        if(!isCustomLayerId(key)) state.layerVisibility[key] = value !== false;
+      }
+    }
+    if(settings.textLayerVisibility && typeof settings.textLayerVisibility === 'object'){
+      for(const [key, value] of Object.entries(settings.textLayerVisibility)){
+        if(state.layers?.[key]){
+          state.layers[key].visible = value !== false;
+          state.layerVisibility[key] = value !== false;
+        }
+      }
+    }
+
+    const importedCustomLayers = Array.isArray(configPayload?.customLayers) ? configPayload.customLayers : [];
+    state.customLayers = [];
+    state.customLayerAssets = {};
+    state.nextCustomLayerId = 1;
+    for(const importedLayer of importedCustomLayers){
+      const img = await loadConfigImageFromDataUrl(importedLayer?.dataUrl || '');
+      if(!img) continue;
+      const id = getNextCustomLayerId();
+      const assetKey = id;
+      const layer = {
+        id,
+        name: String(importedLayer?.name || id).trim() || id,
+        visible: importedLayer?.visible !== false,
+        opacity: Number.isFinite(Number(importedLayer?.opacity)) ? Math.max(0, Math.min(1, Number(importedLayer.opacity))) : 1,
+        zIndex: Number.isFinite(Number(importedLayer?.zIndex)) ? Number(importedLayer.zIndex) : getInsertedZIndex('__top__'),
+        assetKey
+      };
+      state.customLayerAssets[assetKey] = img;
+      state.customLayers.push(layer);
+      state.layerVisibility[id] = layer.visible !== false;
+    }
+
+    const overrideSetCode = normalizeSetCodeInput(settings?.setSymbolOverrides?.setCode || '');
+    const overrideRarity = normalizeRarityCodeInput(settings?.setSymbolOverrides?.rarityCode || '');
+    if(setSymbolSetCode) setSymbolSetCode.value = overrideSetCode;
+    if(setSymbolRarity) setSymbolRarity.value = overrideRarity;
+
+    if(includeFlavor) includeFlavor.checked = !!state.includeFlavor;
+    if(includeReminderText) includeReminderText.checked = !!state.includeReminderText;
+    if(sizeSelect) sizeSelect.value = state.size || 'tall';
+    if(toggleBottomShade) toggleBottomShade.checked = state.layerVisibility.bottomShade !== false;
+    if(toggleBottomShadeCanvas) toggleBottomShadeCanvas.checked = state.layerVisibility.bottomShade !== false;
+    if(toggleCardBorder) toggleCardBorder.checked = state.layerVisibility.cardBorder !== false;
+    if(toggleCardBorderCanvas) toggleCardBorderCanvas.checked = state.layerVisibility.cardBorder !== false;
+    if(toggleFlavourDivider) toggleFlavourDivider.checked = state.layerVisibility.flavourDivider !== false;
+    if(toggleNBPCredit) toggleNBPCredit.checked = !!state.layerVisibility.NBPCredit;
+    if(toggleNB2Credit) toggleNB2Credit.checked = !!state.layerVisibility.NB2Credit;
+
+    syncRulesMaxFontSizeControls();
+    syncRulesParagraphSpacingControls();
+    syncFlavorLineSpacingControls();
+    syncFlavorGapControls();
+    refreshArtTransformControls();
+    refreshManaTuningControls();
+    refreshPTTuningControls();
+    refreshRowPositionTuningControls();
+    refreshExpansionArtistNibControls();
+    refreshExpansionArtistNameControls();
+    refreshCustomLayerPlacementOptions();
+    refreshLayerEditor();
+    recomputeRecommendation();
+
+    if(state.scry) await syncOverlayAndGuides();
+    else {
+      try {
+        await loadTextboxGuide(state.size);
+        await loadRulesShapeGuide(state.size);
+      } catch(err) {}
+      await drawCanvas({ forceFullQuality: true });
+    }
+  }
+
+  async function importConfigurationFile(file){
+    if(!file) return;
+    await withBusy('Importing configuration…', async ()=>{
+      const rawText = await file.text();
+      let parsed = null;
+      try {
+        parsed = JSON.parse(rawText);
+      } catch(err){
+        throw new Error('The selected file is not valid JSON.');
+      }
+      if(!parsed || parsed.type !== 'builder-config'){
+        throw new Error('This file does not look like a Borderless Builder configuration export.');
+      }
+      await applyImportedConfiguration(parsed);
+      updateConfigTransferStatus(`Imported configuration from ${file.name}.`, false);
+    });
+  }
+
+  function bindConfigTransferControls(){
+    const exportBtn = document.getElementById('btnExportConfig');
+    const importBtn = document.getElementById('btnImportConfig');
+    const importFile = document.getElementById('configImportFile');
+    if(exportBtn) exportBtn.addEventListener('click', async ()=>{
+      try {
+        await exportCurrentConfiguration();
+      } catch(err){
+        console.warn('Config export failed', err);
+        updateConfigTransferStatus(err?.message || 'Configuration export failed.', true);
+      }
+    });
+    if(importBtn && importFile){
+      importBtn.addEventListener('click', ()=> importFile.click());
+      importFile.addEventListener('change', async ()=>{
+        const file = importFile.files && importFile.files[0];
+        if(!file) return;
+        try {
+          await importConfigurationFile(file);
+        } catch(err){
+          console.warn('Config import failed', err);
+          updateConfigTransferStatus(err?.message || 'Configuration import failed.', true);
+        } finally {
+          importFile.value = '';
+        }
+      });
+    }
+  }
+
   function renderPrintingStubResults(queryText = ''){
     const results = document.getElementById('printingStubResults');
     const meta = document.getElementById('printingStubMeta');
@@ -8453,7 +9331,7 @@ async function syncOverlayAndGuides(){
 
     const { card: step3, body: step3Body } = createModernStepCard(
       'Step 3: Download',
-      'your completed card image as a .png or as a .zip of each individual layer.'
+      'your completed card image as a .png, raster .psd, or as a .zip of each individual layer.'
     );
     const downloadInfo = document.createElement('div');
     downloadInfo.className = 'miniCard';
@@ -8463,7 +9341,8 @@ async function syncOverlayAndGuides(){
     downloadButtons.className = 'downloadButtonRow';
     btnExportPNG.textContent = 'Download image';
     btnExportZIP.textContent = 'Download Layers .zip';
-    downloadButtons.append(btnExportPNG, btnExportZIP);
+    btnExportPSD.textContent = 'Download Raster .psd';
+    downloadButtons.append(btnExportPNG, btnExportZIP, btnExportPSD);
     step3Body.appendChild(downloadButtons);
     left.appendChild(step3);
 
@@ -8504,8 +9383,15 @@ async function syncOverlayAndGuides(){
     masterAdvanced.className = 'advancedMaster';
     masterAdvanced.innerHTML = `<summary>Advanced options (click to expand)</summary><div class="advancedMasterBody"></div>`;
     const advancedBody = masterAdvanced.querySelector('.advancedMasterBody');
+    const configTransferCard = createConfigTransferCard();
+    if(configTransferCard) advancedBody.appendChild(configTransferCard);
     const misc = createMiscDetails();
     advancedBody.appendChild(misc.details);
+
+    const expansionArtistNibBlock = buildExpansionArtistNibTuningCard();
+    if(expansionArtistNibBlock) misc.grid.appendChild(expansionArtistNibBlock);
+    const expansionArtistNameBlock = buildExpansionArtistNameTuningCard();
+    if(expansionArtistNameBlock) misc.grid.appendChild(expansionArtistNameBlock);
 
     if(paragraphBlock){ paragraphBlock.classList.remove('ghostHidden'); paragraphBlock.classList.add('miscWide'); misc.grid.appendChild(paragraphBlock); }
     if(flavorLineBlock){ flavorLineBlock.classList.remove('ghostHidden'); flavorLineBlock.classList.add('miscWide'); misc.grid.appendChild(flavorLineBlock); }
@@ -8550,6 +9436,11 @@ async function syncOverlayAndGuides(){
   refreshPTTuningControls();
   bindRowPositionTuningControls();
   refreshRowPositionTuningControls();
+  bindExpansionArtistNibControls();
+  refreshExpansionArtistNibControls();
+  bindExpansionArtistNameControls();
+  refreshExpansionArtistNameControls();
+  bindConfigTransferControls();
   bindFastPreviewRangeLifecycle();
   syncRulesMaxFontSizeControls();
   syncRulesParagraphSpacingControls();
